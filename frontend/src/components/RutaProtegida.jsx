@@ -8,7 +8,7 @@ import { Cargando, EstadoVacio } from './ui';
 // Uso: <RutaProtegida><Pantalla /></RutaProtegida>  ·  <RutaProtegida permiso="estadisticas">...</RutaProtegida>
 // Sin hijos, muestra la ruta anidada (<Outlet />).
 export default function RutaProtegida({ permiso, children }) {
-    const { usuario, verificando } = useAuth();
+    const { usuario, verificando, cerroSesion } = useAuth();
     const ubicacion = useLocation();
 
     // Todavía no se sabe si hay sesión: no redirigir antes de tiempo
@@ -16,10 +16,12 @@ export default function RutaProtegida({ permiso, children }) {
         return <Cargando texto="Verificando sesión…" />;
     }
 
-    // Sin sesión: al login, recordando a dónde quería ir para volver después de ingresar.
+    // Sin sesión: al login, recordando a dónde quería ir para volver después de ingresar
+    // (salvo que haya tocado "Salir": ahí se arranca de cero).
     // replace: así "Atrás" no lo devuelve a una página que lo vuelve a mandar al login
     if (!usuario) {
-        return <Navigate to="/ingresar" replace state={{ desde: ubicacion.pathname + ubicacion.search }} />;
+        const estado = cerroSesion ? null : { desde: ubicacion.pathname + ubicacion.search };
+        return <Navigate to="/ingresar" replace state={estado} />;
     }
 
     if (!puede(usuario, permiso)) {

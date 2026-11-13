@@ -13,6 +13,9 @@ export function AuthProvider({ children }) {
     // true mientras se pregunta al servidor si ya hay sesión: evita mandar al login
     // a alguien que sí estaba logueado solo porque la respuesta todavía no llegó
     const [verificando, setVerificando] = useState(true);
+    // true si la persona tocó "Salir": en ese caso el login no recuerda la última pantalla
+    // (en la compu de recepción, quien ingrese después tiene que arrancar en el Panel)
+    const [cerroSesion, setCerroSesion] = useState(false);
 
     // Copia del usuario en una ref para leerla dentro del aviso de 401 sin volver a registrarlo
     const usuarioRef = useRef(null);
@@ -43,6 +46,7 @@ export function AuthProvider({ children }) {
     // Devuelve el usuario si sale bien; si no, lanza el error con el mensaje del servidor
     const ingresar = useCallback(async (email, password) => {
         const datos = await api.login(email, password);
+        setCerroSesion(false);
         setUsuario(datos);
         return datos;
     }, []);
@@ -53,10 +57,14 @@ export function AuthProvider({ children }) {
         } catch {
             // Aunque falle la red, en pantalla se cierra igual la sesión
         }
+        setCerroSesion(true);
         setUsuario(null);
     }, []);
 
-    const valor = useMemo(() => ({ usuario, verificando, ingresar, salir }), [usuario, verificando, ingresar, salir]);
+    const valor = useMemo(
+        () => ({ usuario, verificando, cerroSesion, ingresar, salir }),
+        [usuario, verificando, cerroSesion, ingresar, salir]
+    );
 
     return <AuthContext.Provider value={valor}>{children}</AuthContext.Provider>;
 }
