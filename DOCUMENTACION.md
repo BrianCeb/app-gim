@@ -55,17 +55,33 @@ cuotas e ingresos de un gimnasio, con los datos guardados de forma persistente e
 
 ## 4. Funcionalidades
 
-La aplicación tiene cinco secciones:
+La aplicación tiene una pantalla pública de **Inicio** y cinco secciones que requieren iniciar sesión:
 
 | Sección | Qué permite hacer |
 |---|---|
+| **Inicio** (`/ingresar`) | Propuesta de valor de la aplicación y formulario de ingreso (email y contraseña). Es la única pantalla que se ve sin sesión. |
 | **Panel** | Registrar un ingreso por DNI; ver ingresos del día y cantidad de alumnos al día, por vencer y vencidos; lista de "cuotas a revisar" con botón "Pagó". |
 | **Ingresos** | Registrar ingresos y ver el listado de ingresos de cualquier día (hora, alumno, estado de su cuota). |
 | **Alumnos** | Listado completo; búsqueda por nombre, apellido o DNI (sin importar tildes ni puntos); filtro por estado; alta, edición, eliminación con confirmación, registro de pago y foto. |
 | **Pagos** | Alumnos ordenados por vencimiento (los más urgentes primero), filtro por estado y botón para registrar el pago. |
 | **Estadísticas** | Gráfico de barras de ingresos por día (últimos 30 días), promedio diario, total de alumnos y gráfico de torta con el estado de las cuotas. |
 
+### Roles del personal
+
+Cada cuenta tiene uno de dos roles. El menú muestra solo las secciones permitidas.
+
+| Puede… | Recepción | Administración |
+|---|---|---|
+| Panel, Ingresos y Pagos | ✔ | ✔ |
+| Ver, crear y editar alumnos; registrar pagos y fotos | ✔ | ✔ |
+| Eliminar alumnos | — | ✔ |
+| Estadísticas | — | ✔ |
+
+> Los permisos son un supuesto del equipo, pendiente de confirmar con la dueña del gimnasio.
+
 Además:
+- Cerrar sesión desde el menú (al pie del menú lateral o arriba a la derecha en el celular).
+- Si la sesión vence o desactivan la cuenta, la aplicación vuelve sola al Inicio con un aviso.
 - Mensajes emergentes ("toasts") de éxito y error.
 - Aviso de falta de conexión con botón "Reintentar".
 - Estados de carga y estados vacíos ("Todavía no hay alumnos", "Sin ingresos", etc.).
@@ -98,10 +114,12 @@ Además:
           ┌───────────────────┴────────────────────┐
           │         Servidor Node.js + Express      │
           │                                         │
-          │  /api/alumnos   ─┐                      │
+          │  /api/auth      ─┐  (pública)           │
+          │  /api/alumnos   ─┤                      │
           │  /api/ingresos  ─┼─ API REST (JSON)     │
-          │  /healthz       ─┘                      │
+          │  /healthz       ─┘  (pública)           │
           │  /socket.io      → avisos en tiempo real│
+          │                    (solo con sesión)    │
           │  /* (resto)      → frontend React       │
           │                    compilado (dist/)    │
           └───────────────────┬────────────────────┘
@@ -118,6 +136,37 @@ Es una arquitectura cliente-servidor con una **SPA** (Single Page Application):
    `ingresos:cambio`). Las pantallas abiertas en otros dispositivos reciben el aviso y vuelven a pedir
    los datos por la API. Socket.io solo avisa; los datos siempre viajan por la API REST.
 
+### Flujo de inicio de sesión
+
+```
+ Navegador                                   Servidor                       MongoDB
+    │  POST /api/auth/login {email, password}   │                               │
+    │ ─────────────────────────────────────────▶│  busca el usuario por email   │
+    │                                           │ ─────────────────────────────▶│
+    │                                           │  compara la contraseña con    │
+    │                                           │  el hash (bcrypt)             │
+    │  200 + Set-Cookie: sesion=<JWT>           │                               │
+    │     (httpOnly, SameSite=Strict, 12 h)     │                               │
+    │ ◀─────────────────────────────────────────│                               │
+    │                                           │                               │
+    │  GET /api/alumnos  (la cookie va sola)    │                               │
+    │ ─────────────────────────────────────────▶│ requireAuth: verifica el JWT  │
+    │                                           │ y que el usuario siga activo  │
+    │                                           │ ─────────────────────────────▶│
+    │  200 datos  ·  401 sin sesión  ·  403 sin permiso                         │
+    │ ◀─────────────────────────────────────────│                               │
+```
+
+1. El servidor nunca guarda ni compara contraseñas en texto: solo su **hash** de bcrypt.
+2. El token de sesión (**JWT**) viaja en una **cookie httpOnly**: el JavaScript de la página no puede
+   leerla. Por eso, al abrir la aplicación, el frontend pregunta `GET /api/auth/yo` para saber si ya hay
+   sesión.
+3. En cada pedido, `requireAuth` verifica la firma del token y busca al usuario en la base: si lo
+   desactivaron o le cambiaron el rol, el cambio rige en el pedido siguiente.
+4. `requireRol(...)` controla el rol: **401** = no se sabe quién es; **403** = se sabe, pero no tiene
+   permiso.
+5. Socket.io acepta la conexión solo con la misma cookie válida.
+
 Cualquier ruta que no sea de la API (por ejemplo `/alumnos`) devuelve el `index.html`, así se puede
 refrescar la página en cualquier sección. Las rutas `/api` inexistentes responden un error 404 en JSON,
 nunca HTML.
@@ -133,6 +182,9 @@ nunca HTML.
 | Mongoose 8 | Modelos, validaciones y consultas a MongoDB. |
 | Socket.io 4 | Avisos en tiempo real a las pantallas abiertas. |
 | dotenv | Lectura de variables de entorno desde `.env`. |
+| bcryptjs | Hash de las contraseñas del personal (versión en JavaScript puro: no requiere compilar nada). |
+| jsonwebtoken | Firma y verificación del token de sesión (JWT). |
+| cookie-parser | Lectura de la cookie de sesión en Express y en Socket.io. |
 | mongoose-paginate-v2 | Instalada en el modelo de alumnos para una futura paginación (todavía no se usa). |
 | ES Modules | Sintaxis `import/export` (`"type": "module"`). |
 
@@ -166,13 +218,21 @@ gimnasio-app/
 │   ├── server.js           # arranque de Express, Socket.io, rutas, frontend y errores
 │   ├── .env                # variables secretas (NO se sube a Git)
 │   ├── .env.example        # plantilla sin secretos
+│   ├── scripts/
+│   │   └── crearAdmin.js           # seed del primer administrador (npm run seed:admin)
 │   └── src/
-│       ├── config/db.js            # conexión a MongoDB
+│       ├── config/
+│       │   ├── db.js               # conexión a MongoDB
+│       │   └── auth.js             # JWT y opciones de la cookie de sesión
+│       ├── middlewares/
+│       │   └── auth.js             # requireAuth y requireRol
 │       ├── dao/models/
 │       │   ├── Alumno.js
 │       │   ├── Ingreso.js
-│       │   └── Foto.js
+│       │   ├── Foto.js
+│       │   └── Usuario.js
 │       └── routes/
+│           ├── auth.router.js      # login, logout, yo
 │           ├── alumnos.router.js
 │           └── ingresos.router.js
 └── frontend/
@@ -182,10 +242,11 @@ gimnasio-app/
     └── src/
         ├── main.jsx                # rutas de la aplicación
         ├── index.css
-        ├── pages/                  # Panel, Ingresos, Alumnos, Pagos, Estadísticas
-        ├── components/             # Layout, AlumnoForm, IngresoRapido, RegistrarPago, Modal, ui
-        ├── context/                # DatosContext (datos + Socket.io), AvisosContext (toasts)
-        └── lib/                    # api.js, fechas.js, alumnos.js, imagen.js
+        ├── pages/                  # Inicio, Panel, Ingresos, Alumnos, Pagos, Estadísticas
+        ├── components/             # Layout, RutaProtegida, AlumnoForm, IngresoRapido, RegistrarPago, Modal, ui
+        ├── context/                # AuthContext (sesión), DatosContext (datos + Socket.io), AvisosContext (toasts)
+        ├── hooks/                  # useAuth (custom hook)
+        └── lib/                    # api.js, permisos.js, fechas.js, alumnos.js, imagen.js
 ```
 
 ## 9. Modelo de datos (MongoDB)
@@ -222,24 +283,50 @@ como la URL cambia con cada foto nueva (`?v=...`), se puede guardar en caché po
 **Relación alumno–ingreso:** se vincula por DNI. Si se elimina un alumno, sus ingresos históricos se
 conservan y se muestran como "Alumno eliminado (DNI ...)".
 
+### Colección `usuarios` (modelo `Usuario`)
+Cuentas del personal del gimnasio (no de los alumnos).
+
+| Campo | Tipo | Detalle |
+|---|---|---|
+| `nombre` | String | Obligatorio. |
+| `email` | String | Obligatorio, **único**, se guarda en minúsculas. Es el dato para iniciar sesión. |
+| `passwordHash` | String | Hash bcrypt de la contraseña (nunca la contraseña). `select: false`: no viaja en las consultas ni en las respuestas de la API. |
+| `rol` | String | `administracion` o `recepcion`. |
+| `activo` | Boolean | `true` por defecto. Las cuentas no se borran: se desactivan, y una cuenta inactiva no puede ingresar. |
+| `createdAt`, `updatedAt` | Date | Fechas de alta y última modificación (las agrega Mongoose). |
+
+El primer administrador se crea con `npm run seed:admin`, a partir de las variables `ADMIN_NOMBRE`,
+`ADMIN_EMAIL` y `ADMIN_PASSWORD` (mínimo 8 caracteres). Si el email ya existe, el script no lo modifica.
+
 ## 10. API REST
 
 Todas las respuestas son JSON. Los errores tienen siempre el formato `{ "error": "mensaje" }`.
 
-| Método | Ruta | Descripción | Respuestas principales |
-|---|---|---|---|
-| GET | `/api/alumnos` | Lista de alumnos ordenada por apellido y nombre | 200 |
-| POST | `/api/alumnos` | Crear alumno | 201, 400 (datos inválidos), 409 (DNI repetido) |
-| GET | `/api/alumnos/dni/:dni` | Buscar alumno por DNI | 200, 404 |
-| PUT | `/api/alumnos/:id` | Editar alumno (recalcula el vencimiento) | 200, 400, 404, 409 |
-| DELETE | `/api/alumnos/:id` | Eliminar alumno y su foto | 200, 400 (ID inválido), 404 |
-| POST | `/api/alumnos/:id/pago` | Registrar pago (`fechaPago` opcional; por defecto hoy) | 200, 400, 404 |
-| GET | `/api/alumnos/:id/foto` | Obtener la foto | 200 (imagen), 404 |
-| PUT | `/api/alumnos/:id/foto` | Subir foto (`imagen` como data URL base64) | 200, 400, 404, 413 |
-| DELETE | `/api/alumnos/:id/foto` | Quitar la foto | 200, 404 |
-| GET | `/api/ingresos` | Lista de ingresos, más recientes primero | 200 |
-| POST | `/api/ingresos` | Registrar ingreso por `dni`; devuelve también el alumno | 201, 400, 404 |
-| GET | `/healthz` (o `/health`) | Estado del servidor y de la base de datos | 200, 503 |
+Columna **Acceso**: *pública* = sin sesión; *sesión* = cualquier rol con sesión iniciada;
+*admin* = solo administración. Sin sesión, las rutas protegidas responden **401**; con un rol sin
+permiso, **403**.
+
+| Método | Ruta | Acceso | Descripción | Respuestas principales |
+|---|---|---|---|---|
+| POST | `/api/auth/login` | pública | Iniciar sesión (`email`, `password`); deja la cookie `sesion` | 200, 400, 401 (datos incorrectos), 403 (cuenta desactivada) |
+| POST | `/api/auth/logout` | pública | Cerrar sesión (borra la cookie) | 200 |
+| GET | `/api/auth/yo` | sesión | Usuario de la sesión actual | 200, 401 |
+| GET | `/api/alumnos` | sesión | Lista de alumnos ordenada por apellido y nombre | 200 |
+| POST | `/api/alumnos` | sesión | Crear alumno | 201, 400 (datos inválidos), 409 (DNI repetido) |
+| GET | `/api/alumnos/dni/:dni` | sesión | Buscar alumno por DNI | 200, 404 |
+| PUT | `/api/alumnos/:id` | sesión | Editar alumno (recalcula el vencimiento) | 200, 400, 404, 409 |
+| DELETE | `/api/alumnos/:id` | **admin** | Eliminar alumno y su foto | 200, 400 (ID inválido), 403, 404 |
+| POST | `/api/alumnos/:id/pago` | sesión | Registrar pago (`fechaPago` opcional; por defecto hoy) | 200, 400, 404 |
+| GET | `/api/alumnos/:id/foto` | sesión | Obtener la foto | 200 (imagen), 404 |
+| PUT | `/api/alumnos/:id/foto` | sesión | Subir foto (`imagen` como data URL base64) | 200, 400, 404, 413 |
+| DELETE | `/api/alumnos/:id/foto` | sesión | Quitar la foto | 200, 404 |
+| GET | `/api/ingresos` | sesión | Lista de ingresos, más recientes primero | 200 |
+| POST | `/api/ingresos` | sesión | Registrar ingreso por `dni`; devuelve también el alumno | 201, 400, 404 |
+| GET | `/healthz` (o `/health`) | pública | Estado del servidor y de la base de datos | 200, 503 |
+
+> **Estadísticas** no tiene una ruta propia: se calcula en el navegador con `/api/alumnos` e
+> `/api/ingresos`, que recepción necesita para trabajar. Por eso la restricción de Estadísticas a
+> administración es de la interfaz (no aparece en el menú y la ruta muestra "No tenés acceso").
 
 Ejemplo de creación de alumno:
 
@@ -287,6 +374,34 @@ Respuesta `201 Created`: el alumno guardado con `_id`, `dni: "12345678"` y
   cuando se abre, para que el resto cargue más rápido.
 - **Accesibilidad:** etiquetas para lectores de pantalla, roles `alert`/`status` en los mensajes y
   navegación con teclado.
+- **Sesión (`AuthContext` + custom hook `useAuth`):** guarda quién inició sesión y ofrece `ingresar` y
+  `salir`. Cualquier componente la obtiene con `const { usuario, salir } = useAuth()`. El hook avisa con
+  un error claro si se usa fuera del Provider.
+- **Rutas protegidas (`RutaProtegida`):** mientras se verifica la sesión muestra "Verificando sesión…";
+  sin sesión lleva al Inicio recordando a qué pantalla quería ir (salvo que haya tocado "Salir"); sin
+  permiso muestra "No tenés acceso a esta sección".
+- **Permisos en un solo lugar (`lib/permisos.js`):** la función `puede(usuario, permiso)` la usan el
+  menú, las rutas y los botones. Es solo para la interfaz: la seguridad real está en el backend.
+- **Sesión vencida:** si cualquier pedido responde 401 (o el servidor rechaza el socket), `api.js`
+  avisa a `AuthContext`, que cierra la sesión en pantalla y muestra un aviso. Un solo camino para todos
+  los casos.
+- **`DatosContext` dentro de la parte protegida:** sin sesión no se piden datos ni se abre el socket;
+  al cerrar sesión se desmonta y la conexión se corta.
+
+### Pantalla de Inicio (prototipo de Arquitectura y diseño de interfaces)
+
+| Criterio | Cómo se resolvió |
+|---|---|
+| Propuesta de valor clara | Título "Cuotas e ingresos del gimnasio, bajo control." y una frase que dice para quién es y qué resuelve; tres beneficios concretos con íconos. |
+| Botón "Ingresar" evidente | Botón de ancho completo, el elemento más contrastado del formulario; también se envía con Enter. |
+| Texto e imagen equilibrados | En computadora, pantalla dividida en dos mitades: a la izquierda la propuesta de valor con una ilustración de la app (datos de ejemplo); a la derecha, el formulario. En celular, la propuesta va arriba (sin la ilustración, para no alejar el formulario) y el formulario abajo. |
+| Errores comprensibles | Validación antes de enviar, con el mensaje debajo de cada campo ("Escribí tu email.", "Revisá el email: falta la @ o el dominio"). Los errores del servidor aparecen en un recuadro rojo con ícono: "Email o contraseña incorrectos.", "Tu cuenta está desactivada. Hablá con administración." o "No se pudo conectar con el servidor". |
+| Prevención y recuperación | Botón para mostrar u ocultar la contraseña; al fallar, se borra solo la contraseña (el email queda escrito); texto de ayuda: "¿No tenés cuenta u olvidaste la contraseña? Pedísela a administración." |
+| Consistencia | Mismos colores, tipografía, marca y componentes (`Boton`, `Campo`) que el resto de la aplicación. |
+| Accesibilidad | Etiquetas en todos los campos, `autocomplete` para que el navegador ofrezca guardar la contraseña, `aria-invalid` en campos con error y `role="alert"` en el error del servidor. |
+
+La ilustración es un SVG propio con datos ficticios; se puede reemplazar por una foto real del
+gimnasio sin cambiar el resto de la pantalla.
 
 ## 12. Seguridad
 
@@ -302,18 +417,44 @@ Respuesta `201 Created`: el alumno guardado con `_id`, `dni: "12345678"` y
   gimnasio) y Network Access limitado a las IP del hosting cuando sea posible.
 - Límite de tamaño de las peticiones (1 MB) y validación de imágenes.
 
-**Limitación conocida:** la aplicación no tiene inicio de sesión. Cualquier persona con el enlace
-puede usarla. Ver "Trabajo futuro".
+### Inicio de sesión y permisos
+- **Contraseñas:** se guarda solo el hash de bcrypt (costo 10), nunca la contraseña. Mínimo 8 caracteres.
+- **Token de sesión (JWT):** firmado con `JWT_SECRET` (variable secreta de al menos 32 caracteres; sin
+  ella el servidor no arranca), algoritmo fijo HS256 y vencimiento de 12 horas. Guarda solo el id y el
+  rol del usuario: va firmado, no cifrado, así que no lleva datos sensibles.
+- **Cookie `sesion`:** `httpOnly` (el JavaScript de la página no puede leerla, lo que protege ante XSS),
+  `SameSite=Strict` (el navegador no la manda desde otros sitios, lo que protege ante CSRF) y `Secure`
+  en producción (solo viaja por HTTPS; se activa con `NODE_ENV=production`).
+- **Login sin pistas:** el mismo mensaje si el email no existe o si la contraseña está mal, y la
+  respuesta tarda lo mismo en los dos casos (si el email no existe se compara igual contra un hash de
+  relleno). "Cuenta desactivada" solo se informa a quien escribió la contraseña correcta.
+- **Inyección NoSQL:** email y contraseña se convierten a texto antes de consultar, así un objeto como
+  `{ "$ne": null }` no funciona como operador.
+- **Permisos en el servidor:** `requireAuth` y `requireRol` protegen la API aunque alguien fuerce la
+  interfaz. El rol se lee de la base en cada pedido, no del token.
+- **Fotos:** se sirven con `Cache-Control: private`, para que ningún caché compartido las guarde.
+- **Limitación conocida:** cerrar sesión borra la cookie, pero el token sigue siendo válido hasta que
+  vence (12 h). Lo atenúan la cookie `httpOnly` y que desactivar la cuenta corta el acceso en el
+  pedido siguiente. No hay límite de intentos de login (no está en el backlog).
 
 ## 13. Instalación y ejecución local
 
 Requisito: Node.js 22.12 o superior.
 
-1. Copiar `backend/.env.example` a `backend/.env` y completar `MONGO_URI`.
+1. Copiar `backend/.env.example` a `backend/.env` y completar `MONGO_URI`, `JWT_SECRET` y los datos
+   del primer administrador (`ADMIN_NOMBRE`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`). Para generar
+   `JWT_SECRET`:
+   ```bash
+   node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+   ```
 2. Instalar dependencias:
    ```bash
    npm install --prefix backend
    npm install --prefix frontend
+   ```
+   Crear el primer administrador (una sola vez; si ya existe no hace nada):
+   ```bash
+   npm run seed:admin --prefix backend
    ```
 3. Modo desarrollo (dos terminales):
    ```bash
@@ -336,11 +477,15 @@ Plataforma prevista: **Render**, con un único *Web Service*:
 | Build Command | `npm run build` |
 | Start Command | `npm start` |
 | Health Check Path | `/healthz` |
-| Variables | `MONGO_URI` (secreta), `NODE_VERSION=22` |
+| Variables | `MONGO_URI` (secreta), `JWT_SECRET` (secreta, distinta de la de desarrollo), `NODE_ENV=production`, `NODE_VERSION=22` |
 | Plan | Pago (Starter) para que el servicio no se apague por inactividad |
 
-El servidor primero se conecta a MongoDB y recién después empieza a aceptar pedidos; si no puede
-conectarse, se detiene con un error claro (así el hosting lo detecta y no queda "a medias").
+El primer administrador de producción se crea una vez con `npm run seed:admin --prefix backend`
+(desde la consola *Shell* de Render, con `ADMIN_NOMBRE`, `ADMIN_EMAIL` y `ADMIN_PASSWORD` cargadas como
+variables temporales, que después se pueden borrar).
+
+El servidor primero verifica `JWT_SECRET`, se conecta a MongoDB y recién después empieza a aceptar
+pedidos; si algo falla, se detiene con un error claro (así el hosting lo detecta y no queda "a medias").
 La ruta `/healthz` devuelve 503 si la base no responde.
 
 **Actualizaciones:** se hace `git push` a la rama principal y Render compila y publica la nueva versión.
@@ -354,6 +499,28 @@ Si el build falla, sigue funcionando la versión anterior.
 - Conexión local del backend con MongoDB Atlas (`✅ Conectado a MongoDB`).
 - Prueba manual con Postman de `POST /api/alumnos` → `201 Created` con el documento y su `_id`.
 - Build del frontend generado en `frontend/dist`.
+
+### Inicio de sesión y roles (HU 9)
+Probado en local contra la base real y en Chrome:
+
+| Prueba | Resultado |
+|---|---|
+| Pedidos a `/api/alumnos` e `/api/ingresos` sin sesión o con una cookie inventada | 401 |
+| Login con email inexistente / contraseña incorrecta | 401 con el mismo mensaje y tiempo de respuesta similar |
+| Login con `{ "$ne": null }` como email | 401 (no funciona como operador) |
+| Login correcto | 200 y cookie `HttpOnly; SameSite=Strict; Max-Age=43200` |
+| Cuenta desactivada / token de un rol que ya no coincide con la base | 401 / 403 (manda la base) |
+| Recepción intenta eliminar un alumno | 403 (y no se borra nada) |
+| Socket.io sin sesión | Conexión rechazada ("No autorizado") |
+| Seed del administrador ejecutado dos veces | Lo crea la primera vez; la segunda no modifica nada |
+| Entrar a `/alumnos` sin sesión | Redirige a `/ingresar` y, al ingresar, vuelve a `/alumnos` |
+| Formulario vacío / contraseña incorrecta | Mensajes debajo de cada campo / recuadro rojo con el error del servidor |
+| "Salir" | Borra la cookie, muestra "Cerraste sesión." y vuelve al Inicio sin recordar la pantalla anterior |
+| Sesión vencida con la pantalla abierta | Vuelve sola al Inicio con un aviso |
+| Inicio en celular (390 px) y en computadora | Se adapta sin desbordes |
+
+Pendiente: probar en pantalla con una cuenta de recepción (menú sin Estadísticas y sin botón
+"Eliminar"), cuando exista la gestión de cuentas (HU 10).
 
 Pruebas de aceptación a completar en producción (lista de verificación):
 
@@ -369,6 +536,9 @@ Pruebas de aceptación a completar en producción (lista de verificación):
 - [ ] Los errores se muestran de forma comprensible (por ejemplo, DNI repetido).
 - [ ] Funciona sin visitar antes ninguna URL de backend.
 - [ ] No hay secretos en Git ni en el bundle del frontend.
+- [ ] Sin sesión, cualquier sección lleva al Inicio; con sesión, se puede refrescar sin perderla.
+- [ ] La cookie de sesión sale con `Secure` (HTTPS) en producción.
+- [ ] Recepción no ve Estadísticas ni el botón "Eliminar"; administración sí.
 
 ## 16. Evolución del proyecto y problemas resueltos
 
@@ -396,10 +566,14 @@ Problemas encontrados (o riesgos previstos) durante el desarrollo y cómo se res
 | Rutas de API inexistentes devolvían HTML. | Manejador 404 en JSON para `/api`. |
 | Había que recargar la página para ver cambios. | Recarga automática tras cada acción y avisos por Socket.io. |
 | Fotos pesadas. | Se achican en el navegador y se guardan aparte en la colección `fotos`. |
+| Cualquiera con el enlace podía usar la aplicación. | Inicio de sesión con roles (HU 9): JWT en cookie httpOnly y permisos en el servidor. |
+| Vulnerabilidades en dependencias (`npm audit`: Mongoose, Engine.IO, body-parser). | `npm audit fix` dentro de las mismas versiones mayores; 0 vulnerabilidades. |
+| Después de "Salir", el login recordaba la última pantalla (la próxima persona caía ahí). | `AuthContext` registra si la sesión se cerró a propósito y `RutaProtegida` no la recuerda en ese caso. |
 
 ## 17. Limitaciones y trabajo futuro
 
-- **Autenticación:** agregar inicio de sesión para el personal del gimnasio.
+- **Gestión de cuentas del personal** desde la aplicación (HU 10, en curso): hoy solo existe el
+  administrador creado con el seed.
 - **Paginación** del listado de alumnos (la librería ya está instalada; se pospuso a propósito).
 - **Historial de pagos:** hoy solo se guarda el último pago; podría registrarse cada pago con su monto.
 - **Montos y precios** de cuotas, y reportes de recaudación.
@@ -431,3 +605,14 @@ CORS y hizo la aplicación más fiable para su uso real en el gimnasio.
 - **Health check:** ruta que el hosting consulta para saber si el servicio funciona.
 - **Socket.io / WebSocket:** conexión abierta entre navegador y servidor para enviar avisos al instante.
 - **ODM (Mongoose):** librería que permite trabajar con MongoDB usando modelos y validaciones.
+- **Hash (bcrypt):** resumen de la contraseña que no se puede revertir; para comprobarla se calcula el
+  hash de lo escrito y se compara con el guardado.
+- **JWT (JSON Web Token):** texto firmado por el servidor que dice quién es el usuario y hasta cuándo
+  vale. Si alguien lo modifica, la firma deja de coincidir.
+- **Cookie httpOnly:** dato que el navegador guarda y manda solo en cada pedido al servidor, pero que
+  el JavaScript de la página no puede leer.
+- **401 / 403:** "no sé quién sos" (hay que iniciar sesión) / "sé quién sos, pero no tenés permiso".
+- **Middleware:** función de Express que se ejecuta antes de la ruta y puede dejar pasar o cortar el
+  pedido (por ejemplo, `requireAuth`).
+- **Custom hook:** función propia que empieza con `use` y reúne hooks de React para reutilizarlos
+  (por ejemplo, `useAuth`).
