@@ -1,14 +1,18 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { ChartColumn, Dumbbell, LayoutDashboard, LogIn, RefreshCw, Users, Wallet, WifiOff } from 'lucide-react';
+import { ChartColumn, Dumbbell, LayoutDashboard, LogIn, LogOut, RefreshCw, Users, Wallet, WifiOff } from 'lucide-react';
 import { useDatos } from '../context/DatosContext';
-import { Boton } from './ui';
+import { useAvisos } from '../context/AvisosContext';
+import { useAuth } from '../hooks/useAuth';
+import { ETIQUETA_ROL, puede } from '../lib/permisos';
+import { Boton, BotonIcono } from './ui';
 
+// permiso: si la sección está restringida (ver lib/permisos.js). Sin permiso = la ven todos los roles
 const SECCIONES = [
     { a: '/', etiqueta: 'Panel', icono: LayoutDashboard },
     { a: '/ingresos', etiqueta: 'Ingresos', icono: LogIn },
     { a: '/alumnos', etiqueta: 'Alumnos', icono: Users },
     { a: '/pagos', etiqueta: 'Pagos', icono: Wallet },
-    { a: '/estadisticas', etiqueta: 'Estadísticas', icono: ChartColumn }
+    { a: '/estadisticas', etiqueta: 'Estadísticas', icono: ChartColumn, permiso: 'estadisticas' }
 ];
 
 function Marca() {
@@ -40,6 +44,18 @@ function AvisoConexion() {
 }
 
 export default function Layout() {
+    const { usuario, salir } = useAuth();
+    const avisar = useAvisos();
+
+    // Cada rol ve solo las secciones que puede usar
+    const secciones = SECCIONES.filter((s) => puede(usuario, s.permiso));
+
+    // No hace falta navegar: al quedar sin usuario, RutaProtegida lleva solo al login
+    const cerrarSesion = async () => {
+        await salir();
+        avisar('exito', 'Cerraste sesión.');
+    };
+
     return (
         <div className="min-h-dvh">
             {/* Menú lateral (computadora) */}
@@ -48,7 +64,7 @@ export default function Layout() {
                     <Marca />
                 </div>
                 <nav className="mt-10 flex flex-col gap-1" aria-label="Secciones">
-                    {SECCIONES.map(({ a, etiqueta, icono: Icono }) => (
+                    {secciones.map(({ a, etiqueta, icono: Icono }) => (
                         <NavLink
                             key={a}
                             to={a}
@@ -64,11 +80,28 @@ export default function Layout() {
                         </NavLink>
                     ))}
                 </nav>
+
+                {/* Quién está usando la app y botón para salir */}
+                <div className="mt-auto flex items-center gap-3 border-t border-white/10 px-2 pt-4">
+                    <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold">{usuario.nombre}</p>
+                        <p className="text-xs text-slate-400">{ETIQUETA_ROL[usuario.rol]}</p>
+                    </div>
+                    <BotonIcono etiqueta="Cerrar sesión" onClick={cerrarSesion} className="text-slate-400 hover:bg-white/10 hover:text-white">
+                        <LogOut className="size-5" aria-hidden />
+                    </BotonIcono>
+                </div>
             </aside>
 
             {/* Barra superior (celular) */}
-            <header className="sticky top-0 z-30 flex items-center bg-slate-900 px-4 py-3 text-white lg:hidden">
+            <header className="sticky top-0 z-30 flex items-center gap-3 bg-slate-900 px-4 py-3 text-white lg:hidden">
                 <Marca />
+                <span className="ml-auto truncate text-right text-xs text-slate-400">
+                    {usuario.nombre.split(' ')[0]} · {ETIQUETA_ROL[usuario.rol]}
+                </span>
+                <BotonIcono etiqueta="Cerrar sesión" onClick={cerrarSesion} className="-mr-2 text-slate-400 hover:bg-white/10 hover:text-white">
+                    <LogOut className="size-5" aria-hidden />
+                </BotonIcono>
             </header>
 
             <main className="px-4 pt-6 pb-28 sm:px-6 lg:pb-10 lg:pl-72 lg:pr-8">
@@ -79,11 +112,14 @@ export default function Layout() {
             </main>
 
             {/* Barra inferior (celular) */}
+            {/* La cantidad de columnas depende de cuántas secciones ve el rol. Va en style porque
+                Tailwind no puede generar una clase grid-cols-N con un número calculado en el momento */}
             <nav
                 aria-label="Secciones"
-                className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden"
+                style={{ gridTemplateColumns: `repeat(${secciones.length}, minmax(0, 1fr))` }}
+                className="fixed inset-x-0 bottom-0 z-30 grid border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden"
             >
-                {SECCIONES.map(({ a, etiqueta, icono: Icono }) => (
+                {secciones.map(({ a, etiqueta, icono: Icono }) => (
                     <NavLink
                         key={a}
                         to={a}
