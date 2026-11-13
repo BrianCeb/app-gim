@@ -159,6 +159,7 @@ gimnasio-app/
 ├── package.json            # scripts globales: build y start (los usa el hosting)
 ├── README.md               # guía rápida de uso, API y deploy
 ├── DOCUMENTACION.md        # este documento
+├── CLAUDE.md               # contexto y reglas de trabajo para Claude Code
 ├── .gitignore              # excluye node_modules, dist y .env
 ├── backend/
 │   ├── package.json
@@ -371,7 +372,8 @@ Pruebas de aceptación a completar en producción (lista de verificación):
 
 ## 16. Evolución del proyecto y problemas resueltos
 
-### Versión inicial (carpeta `backend1-gim/`)
+### Versión inicial (repositorio aparte `backend1-gim` en GitHub)
+Ya no forma parte de este repositorio: se conserva solo como antecedente en su propio repositorio.
 - Backend Express con vistas **Handlebars** y un `client.js` con Socket.io.
 - Datos de prueba en un archivo `alumnos.json`.
 - Un frontend React separado (componentes `AlumnoList`, `AlumnosForm`, `AvisoPago`,
