@@ -1,4 +1,13 @@
 // Todas las llamadas usan rutas relativas (/api/...): frontend y backend comparten la misma URL.
+// Por eso el navegador manda solo la cookie de sesión (httpOnly) en cada pedido: no hay que tocar el token.
+
+// Función que se ejecuta cuando el servidor responde 401 (sesión vencida o cuenta desactivada).
+// La registra AuthContext para cerrar la sesión en pantalla y volver al login.
+let alNoAutorizado = null;
+export function configurarNoAutorizado(funcion) {
+    alNoAutorizado = funcion;
+}
+
 async function pedir(url, { method = 'GET', body } = {}) {
     let res;
     try {
@@ -12,6 +21,11 @@ async function pedir(url, { method = 'GET', body } = {}) {
     }
 
     const datos = await res.json().catch(() => null);
+
+    // En el login, 401 solo significa "email o contraseña incorrectos": no hay sesión que cerrar
+    if (res.status === 401 && url !== '/api/auth/login') {
+        alNoAutorizado?.(datos?.error);
+    }
     if (!res.ok) {
         throw new Error(datos?.error || `Error del servidor (${res.status}).`);
     }
@@ -19,6 +33,10 @@ async function pedir(url, { method = 'GET', body } = {}) {
 }
 
 export const api = {
+    login: (email, password) => pedir('/api/auth/login', { method: 'POST', body: { email, password } }),
+    logout: () => pedir('/api/auth/logout', { method: 'POST' }),
+    yo: () => pedir('/api/auth/yo'),
+
     alumnos: () => pedir('/api/alumnos'),
     crearAlumno: (datos) => pedir('/api/alumnos', { method: 'POST', body: datos }),
     editarAlumno: (id, datos) => pedir(`/api/alumnos/${id}`, { method: 'PUT', body: datos }),
