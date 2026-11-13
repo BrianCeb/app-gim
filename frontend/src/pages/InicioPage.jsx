@@ -110,7 +110,8 @@ export default function InicioPage() {
                     <span className="text-lg font-bold tracking-tight">GimnasioApp</span>
                 </div>
 
-                <div className="mt-10 max-w-lg lg:mt-auto">
+                {/* my-auto centra el bloque en pantallas altas; pt-10 asegura aire bajo el logo en las bajas */}
+                <div className="max-w-lg pt-10 lg:my-auto">
                     <h1 className="text-3xl font-bold tracking-tight text-balance sm:text-4xl xl:text-5xl">
                         Cuotas e ingresos del gimnasio, <span className="text-emerald-400">bajo control.</span>
                     </h1>
@@ -128,9 +129,8 @@ export default function InicioPage() {
                             </li>
                         ))}
                     </ul>
+                    <IlustracionInicio className="mt-10 hidden w-full max-w-sm lg:block" />
                 </div>
-
-                <IlustracionInicio className="mt-12 mb-auto hidden w-full max-w-md lg:block" />
             </section>
 
             {/* Formulario de ingreso */}
@@ -159,6 +159,9 @@ export default function InicioPage() {
                                 <input
                                     type={verPassword ? 'text' : 'password'}
                                     autoComplete="current-password"
+                                    // el botón del ojo está dentro de la etiqueta: sin esto el lector de
+                                    // pantalla anunciaría "Contraseña Mostrar contraseña"
+                                    aria-label="Contraseña"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     aria-invalid={!!errores.password}
