@@ -41,12 +41,18 @@ export const api = {
     crearAlumno: (datos) => pedir('/api/alumnos', { method: 'POST', body: datos }),
     editarAlumno: (id, datos) => pedir(`/api/alumnos/${id}`, { method: 'PUT', body: datos }),
     eliminarAlumno: (id) => pedir(`/api/alumnos/${id}`, { method: 'DELETE' }),
-    registrarPago: (id, fechaPago) => pedir(`/api/alumnos/${id}/pago`, { method: 'POST', body: { fechaPago } }),
+    // plan: el plan con el que paga (puede ser otro distinto del que tenía)
+    registrarPago: (id, fechaPago, plan) => pedir(`/api/alumnos/${id}/pago`, { method: 'POST', body: { fechaPago, plan } }),
     subirFoto: (id, imagen) => pedir(`/api/alumnos/${id}/foto`, { method: 'PUT', body: { imagen } }),
     eliminarFoto: (id) => pedir(`/api/alumnos/${id}/foto`, { method: 'DELETE' }),
 
     ingresos: () => pedir('/api/ingresos'),
     registrarIngreso: (dni) => pedir('/api/ingresos', { method: 'POST', body: { dni } }),
+
+    // Planes de cuota: verlos, cualquiera con sesión; crear y editar, solo administración
+    planes: () => pedir('/api/planes'),
+    crearPlan: (datos) => pedir('/api/planes', { method: 'POST', body: datos }),
+    editarPlan: (id, datos) => pedir(`/api/planes/${id}`, { method: 'PUT', body: datos }),
 
     // Cuentas del personal (solo administración; con otro rol la API responde 403)
     usuarios: () => pedir('/api/usuarios'),
