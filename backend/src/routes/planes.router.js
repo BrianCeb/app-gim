@@ -72,6 +72,11 @@ function responderError(res, error, mensaje) {
     return res.status(500).json({ error: mensaje });
 }
 
+// Avisa por Socket.io a las pantallas abiertas que los planes cambiaron, para que recarguen la lista
+function avisarCambio(req) {
+    req.app.get('io')?.emit('planes:cambio');
+}
+
 // Busca otro plan con el mismo nombre sin importar mayúsculas ("mensual" = "Mensual").
 // El índice único de Mongo distingue mayúsculas, por eso se controla también acá
 async function existeOtroConNombre(nombre, idExcluido = null) {
@@ -108,6 +113,7 @@ router.post('/', requireRol('administracion'), async (req, res) => {
         }
 
         const plan = await Plan.create(datos);
+        avisarCambio(req);
         res.status(201).json(plan);
     } catch (error) {
         responderError(res, error, 'Error al crear el plan');
@@ -138,6 +144,7 @@ router.put('/:id', requireRol('administracion'), async (req, res) => {
 
         Object.assign(plan, datos, { activo: req.body.activo });
         await plan.save();
+        avisarCambio(req);
         res.json(plan);
     } catch (error) {
         responderError(res, error, 'Error al editar el plan');
