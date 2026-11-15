@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { ChartColumn, Dumbbell, LayoutDashboard, LogIn, LogOut, RefreshCw, Users, Wallet, WifiOff } from 'lucide-react';
+import { ChartColumn, Dumbbell, LayoutDashboard, LogIn, LogOut, RefreshCw, UserCog, Users, Wallet, WifiOff } from 'lucide-react';
 import { useDatos } from '../context/DatosContext';
 import { useAvisos } from '../context/AvisosContext';
 import { useAuth } from '../hooks/useAuth';
@@ -12,7 +12,8 @@ const SECCIONES = [
     { a: '/ingresos', etiqueta: 'Ingresos', icono: LogIn },
     { a: '/alumnos', etiqueta: 'Alumnos', icono: Users },
     { a: '/pagos', etiqueta: 'Pagos', icono: Wallet },
-    { a: '/estadisticas', etiqueta: 'Estadísticas', icono: ChartColumn, permiso: 'estadisticas' }
+    { a: '/estadisticas', etiqueta: 'Estadísticas', icono: ChartColumn, permiso: 'estadisticas' },
+    { a: '/personal', etiqueta: 'Personal', icono: UserCog, permiso: 'personal' }
 ];
 
 function Marca() {

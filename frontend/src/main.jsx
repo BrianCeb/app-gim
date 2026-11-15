@@ -11,6 +11,7 @@ import PanelPage from './pages/PanelPage';
 import AlumnosPage from './pages/AlumnosPage';
 import IngresosPage from './pages/IngresosPage';
 import PagosPage from './pages/PagosPage';
+import PersonalPage from './pages/PersonalPage';
 import { Cargando, EstadoVacio } from './components/ui';
 import './index.css';
 
@@ -60,6 +61,14 @@ createRoot(document.getElementById('root')).render(
                                         <Suspense fallback={<Cargando />}>
                                             <EstadisticasPage />
                                         </Suspense>
+                                    </RutaProtegida>
+                                }
+                            />
+                            <Route
+                                path="/personal"
+                                element={
+                                    <RutaProtegida permiso="personal">
+                                        <PersonalPage />
                                     </RutaProtegida>
                                 }
                             />
