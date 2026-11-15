@@ -18,10 +18,10 @@ gimnasio-app/
 │       ├── config/      # db.js, auth.js (JWT y cookie)
 │       ├── middlewares/ # auth.js: requireAuth, requireRol
 │       ├── dao/models/  # Alumno, Ingreso, Foto, Usuario
-│       └── routes/      # auth.router.js, alumnos.router.js, ingresos.router.js
+│       └── routes/      # auth.router.js, alumnos.router.js, ingresos.router.js, usuarios.router.js
 ├── frontend/           # React
 │   └── src/
-│       ├── pages/       # Inicio, Panel, Ingresos, Alumnos, Pagos, Estadísticas
+│       ├── pages/       # Inicio, Panel, Ingresos, Alumnos, Pagos, Estadísticas, Personal
 │       ├── components/  # Layout, RutaProtegida, formularios, ui
 │       ├── context/     # sesión (AuthContext), datos compartidos y avisos
 │       ├── hooks/       # useAuth
@@ -61,8 +61,10 @@ La app abre en el **Inicio** (`/ingresar`): ingresá con el email y la contrase�
 | Ver, crear y editar alumnos; registrar pagos y fotos | ✔ | ✔ |
 | Eliminar alumnos | — | ✔ |
 | Estadísticas | — | ✔ |
+| Personal: crear, editar, activar/desactivar cuentas y cambiar contraseñas | — | ✔ |
 
 Las cuentas no se borran: se desactivan. Contraseña mínima: 8 caracteres. La sesión dura 12 horas.
+Nadie puede cambiar su propio rol ni desactivarse, y siempre queda al menos un administrador activo.
 
 ## API
 
@@ -82,6 +84,10 @@ Todas las rutas `/api` piden sesión, salvo login y logout. Sin sesión → **40
 | GET / PUT / DELETE | `/api/alumnos/:id/foto` | Ver / subir (`imagen` en base64) / quitar foto |
 | GET | `/api/ingresos` | Lista de ingresos (más recientes primero) |
 | POST | `/api/ingresos` | Registrar ingreso (`dni`); devuelve también el alumno |
+| GET | `/api/usuarios` | Cuentas del personal — **solo administración** (igual que las tres siguientes) |
+| POST | `/api/usuarios` | Crear cuenta (`nombre, email, rol, password`) |
+| PUT | `/api/usuarios/:id` | Editar cuenta (`nombre, email, rol, activo`) |
+| PUT | `/api/usuarios/:id/password` | Poner una contraseña nueva (`password`) |
 | GET | `/healthz` | Estado del servidor y de la base (503 si la base no responde) |
 
 Los errores siempre vuelven como JSON: `{ "error": "mensaje para mostrar" }`.

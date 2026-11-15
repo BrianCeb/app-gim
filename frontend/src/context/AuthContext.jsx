@@ -61,9 +61,15 @@ export function AuthProvider({ children }) {
         setUsuario(null);
     }, []);
 
+    // Cuando administración edita su propia cuenta (por ejemplo, el nombre), el menú se actualiza
+    // sin recargar. Solo reemplaza los datos en pantalla: la sesión (la cookie) sigue siendo la misma
+    const actualizarUsuario = useCallback((datos) => {
+        setUsuario((actual) => (actual && actual._id === datos._id ? datos : actual));
+    }, []);
+
     const valor = useMemo(
-        () => ({ usuario, verificando, cerroSesion, ingresar, salir }),
-        [usuario, verificando, cerroSesion, ingresar, salir]
+        () => ({ usuario, verificando, cerroSesion, ingresar, salir, actualizarUsuario }),
+        [usuario, verificando, cerroSesion, ingresar, salir, actualizarUsuario]
     );
 
     return <AuthContext.Provider value={valor}>{children}</AuthContext.Provider>;

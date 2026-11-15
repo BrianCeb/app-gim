@@ -13,13 +13,14 @@ import connectDB from './src/config/db.js';
 
 // 🧩 sesión
 import { NOMBRE_COOKIE, verificarConfigAuth, verificarToken } from './src/config/auth.js';
-import { requireAuth } from './src/middlewares/auth.js';
+import { requireAuth, requireRol } from './src/middlewares/auth.js';
 import Usuario from './src/dao/models/Usuario.js';
 
 // 🧩 rutas
 import authRouter from './src/routes/auth.router.js';
 import alumnosRouter from './src/routes/alumnos.router.js';
 import ingresosRouter from './src/routes/ingresos.router.js';
+import usuariosRouter from './src/routes/usuarios.router.js';
 
 // 🔧 configuración base
 dotenv.config();
@@ -62,6 +63,8 @@ app.use(cookieParser()); // deja las cookies en req.cookies (ahí viaja el token
 app.use('/api/auth', authRouter);
 app.use('/api/alumnos', requireAuth, alumnosRouter);
 app.use('/api/ingresos', requireAuth, ingresosRouter);
+// Cuentas del personal: todo el router es solo para administración
+app.use('/api/usuarios', requireAuth, requireRol('administracion'), usuariosRouter);
 
 // ❓ rutas /api inexistentes: responder JSON, nunca HTML
 app.use('/api', (req, res) => {

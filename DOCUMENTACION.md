@@ -55,7 +55,7 @@ cuotas e ingresos de un gimnasio, con los datos guardados de forma persistente e
 
 ## 4. Funcionalidades
 
-La aplicación tiene una pantalla pública de **Inicio** y cinco secciones que requieren iniciar sesión:
+La aplicación tiene una pantalla pública de **Inicio** y seis secciones que requieren iniciar sesión:
 
 | Sección | Qué permite hacer |
 |---|---|
@@ -65,6 +65,7 @@ La aplicación tiene una pantalla pública de **Inicio** y cinco secciones que r
 | **Alumnos** | Listado completo; búsqueda por nombre, apellido o DNI (sin importar tildes ni puntos); filtro por estado; alta, edición, eliminación con confirmación, registro de pago y foto. |
 | **Pagos** | Alumnos ordenados por vencimiento (los más urgentes primero), filtro por estado y botón para registrar el pago. |
 | **Estadísticas** | Gráfico de barras de ingresos por día (últimos 30 días), promedio diario, total de alumnos y gráfico de torta con el estado de las cuotas. |
+| **Personal** | Cuentas para ingresar a la app: alta (nombre, email, rol y contraseña), edición, activar o desactivar con confirmación y cambio de contraseña. Solo administración. |
 
 ### Roles del personal
 
@@ -76,6 +77,7 @@ Cada cuenta tiene uno de dos roles. El menú muestra solo las secciones permitid
 | Ver, crear y editar alumnos; registrar pagos y fotos | ✔ | ✔ |
 | Eliminar alumnos | — | ✔ |
 | Estadísticas | — | ✔ |
+| Personal (gestionar las cuentas) | — | ✔ |
 
 > Los permisos son un supuesto del equipo, pendiente de confirmar con la dueña del gimnasio.
 
@@ -103,6 +105,19 @@ Además:
 - Un ingreso solo se registra si existe un alumno con ese DNI. El ingreso se registra aunque la cuota
   esté vencida, pero la pantalla lo avisa claramente en rojo.
 - Las fechas se muestran en formato argentino (dd/mm/aaaa).
+
+### Cuentas del personal (HU 10)
+Decididas por el equipo (Sprint 1):
+- Las cuentas **no se borran: se desactivan**, y se pueden volver a activar. Una cuenta desactivada no
+  puede ingresar, y si tenía la sesión abierta se le corta en el pedido siguiente.
+- Las contraseñas las pone y las cambia administración (no hay recuperación por email). Mínimo 8
+  caracteres. Al crear una cuenta, administración le pasa la contraseña a la persona.
+- El email es único (no distingue mayúsculas) y es el dato para iniciar sesión.
+- **Nadie puede cambiar su propio rol ni desactivar su propia cuenta**: en la cuenta propia solo se
+  cambian nombre, email y contraseña. Evita quedarse afuera sin querer.
+- **Siempre tiene que quedar al menos un administrador activo.** Con la regla anterior esto ya no
+  puede pasar desde la app (quien edita es un administrador activo), pero el servidor lo controla igual
+  como segunda protección.
 
 ## 6. Arquitectura
 
@@ -234,7 +249,8 @@ gimnasio-app/
 │       └── routes/
 │           ├── auth.router.js      # login, logout, yo
 │           ├── alumnos.router.js
-│           └── ingresos.router.js
+│           ├── ingresos.router.js
+│           └── usuarios.router.js  # cuentas del personal (solo administración)
 └── frontend/
     ├── package.json
     ├── vite.config.js      # plugins y proxy de desarrollo hacia el backend
@@ -242,8 +258,8 @@ gimnasio-app/
     └── src/
         ├── main.jsx                # rutas de la aplicación
         ├── index.css
-        ├── pages/                  # Inicio, Panel, Ingresos, Alumnos, Pagos, Estadísticas
-        ├── components/             # Layout, RutaProtegida, AlumnoForm, IngresoRapido, RegistrarPago, Modal, ui
+        ├── pages/                  # Inicio, Panel, Ingresos, Alumnos, Pagos, Estadísticas, Personal
+        ├── components/             # Layout, RutaProtegida, AlumnoForm, UsuarioForm, IngresoRapido, RegistrarPago, Modal, ui
         ├── context/                # AuthContext (sesión), DatosContext (datos + Socket.io), AvisosContext (toasts)
         ├── hooks/                  # useAuth (custom hook)
         └── lib/                    # api.js, permisos.js, fechas.js, alumnos.js, imagen.js
@@ -322,6 +338,10 @@ permiso, **403**.
 | DELETE | `/api/alumnos/:id/foto` | sesión | Quitar la foto | 200, 404 |
 | GET | `/api/ingresos` | sesión | Lista de ingresos, más recientes primero | 200 |
 | POST | `/api/ingresos` | sesión | Registrar ingreso por `dni`; devuelve también el alumno | 201, 400, 404 |
+| GET | `/api/usuarios` | **admin** | Cuentas del personal (activas primero, por nombre), sin el hash | 200, 403 |
+| POST | `/api/usuarios` | **admin** | Crear cuenta (`nombre`, `email`, `rol`, `password`) | 201, 400, 403, 409 (email repetido) |
+| PUT | `/api/usuarios/:id` | **admin** | Editar `nombre`, `email`, `rol` y `activo` (booleano, obligatorio) | 200, 400 (datos inválidos o cambio sobre la propia cuenta), 403, 404, 409 (email repetido o último admin) |
+| PUT | `/api/usuarios/:id/password` | **admin** | Poner una contraseña nueva (`password`) | 200, 400, 403, 404 |
 | GET | `/healthz` (o `/health`) | pública | Estado del servidor y de la base de datos | 200, 503 |
 
 > **Estadísticas** no tiene una ruta propia: se calcula en el navegador con `/api/alumnos` e
@@ -387,6 +407,12 @@ Respuesta `201 Created`: el alumno guardado con `_id`, `dni: "12345678"` y
   los casos.
 - **`DatosContext` dentro de la parte protegida:** sin sesión no se piden datos ni se abre el socket;
   al cerrar sesión se desmonta y la conexión se corta.
+- **Pantalla Personal:** la lista de cuentas no va en `DatosContext` porque solo la usa esta pantalla:
+  se pide al entrar, y recepción nunca la descarga. El formulario de edición no toca la contraseña ni
+  el estado activo; cada uno tiene su botón (la contraseña se escribe dos veces, y desactivar pide
+  confirmación). En la cuenta propia el rol aparece bloqueado y no está el botón de desactivar.
+- **`actualizarUsuario` en `AuthContext`:** si administración edita su propia cuenta, el menú muestra
+  el nombre nuevo sin recargar. Solo cambia los datos en pantalla; la cookie de sesión sigue igual.
 
 ### Pantalla de Inicio (prototipo de Arquitectura y diseño de interfaces)
 
@@ -432,10 +458,16 @@ gimnasio sin cambiar el resto de la pantalla.
   `{ "$ne": null }` no funciona como operador.
 - **Permisos en el servidor:** `requireAuth` y `requireRol` protegen la API aunque alguien fuerce la
   interfaz. El rol se lee de la base en cada pedido, no del token.
+- **Cuentas del personal:** el permiso de administración se pone una sola vez, al montar
+  `/api/usuarios` en `server.js` (`requireAuth` + `requireRol('administracion')`), así una ruta nueva
+  del router no puede quedar desprotegida por olvido. La contraseña se cambia por una ruta aparte, y
+  `activo` se exige como booleano (el texto `"false"` no cuenta como verdadero).
 - **Fotos:** se sirven con `Cache-Control: private`, para que ningún caché compartido las guarde.
 - **Limitación conocida:** cerrar sesión borra la cookie, pero el token sigue siendo válido hasta que
   vence (12 h). Lo atenúan la cookie `httpOnly` y que desactivar la cuenta corta el acceso en el
-  pedido siguiente. No hay límite de intentos de login (no está en el backlog).
+  pedido siguiente. Por lo mismo, **cambiar la contraseña no cierra las sesiones ya abiertas** de esa
+  cuenta: para echar a alguien en el momento hay que desactivarla. No hay límite de intentos de login
+  (no está en el backlog).
 
 ## 13. Instalación y ejecución local
 
@@ -519,8 +551,24 @@ Probado en local contra la base real y en Chrome:
 | Sesión vencida con la pantalla abierta | Vuelve sola al Inicio con un aviso |
 | Inicio en celular (390 px) y en computadora | Se adapta sin desbordes |
 
-Pendiente: probar en pantalla con una cuenta de recepción (menú sin Estadísticas y sin botón
-"Eliminar"), cuando exista la gestión de cuentas (HU 10).
+### Gestión de cuentas del personal (HU 10)
+Probado en local contra la base real con un script de 28 pedidos (la cuenta de prueba se borró al
+terminar) y en el navegador por el equipo:
+
+| Prueba | Resultado |
+|---|---|
+| `/api/usuarios` sin sesión / con una cuenta de recepción | 401 / 403 |
+| La lista no incluye `passwordHash` | ✔ |
+| Alta con contraseña de 7 caracteres, email inválido, rol inexistente, nombre vacío o `{ "$ne": null }` como contraseña | 400 con el mensaje correspondiente |
+| Alta correcta (`Recepcion@Prueba.test`) | 201, email guardado en minúsculas, `activo: true` |
+| Alta o edición con un email que ya existe | 409 |
+| Administración se baja su propio rol / se desactiva | 400 "No podés cambiar tu propio rol ni desactivar tu cuenta." |
+| `activo: "false"` (texto), ID inválido, cuenta inexistente | 400 / 400 / 404 |
+| Desactivar una cuenta con la sesión abierta | Su siguiente pedido responde 401 y no puede volver a entrar (403) |
+| Cambiar la contraseña | La vieja da 401, la nueva entra |
+| En pantalla: crear una cuenta de recepción y entrar con ella | Menú sin Estadísticas ni Personal; sin botón "Eliminar" en Alumnos |
+| En pantalla: editar la cuenta propia | Rol bloqueado, sin botón de desactivar; el nombre nuevo aparece en el menú al instante |
+| Barra inferior del celular con los 6 ítems de administración | Se ve bien |
 
 Pruebas de aceptación a completar en producción (lista de verificación):
 
@@ -538,7 +586,8 @@ Pruebas de aceptación a completar en producción (lista de verificación):
 - [ ] No hay secretos en Git ni en el bundle del frontend.
 - [ ] Sin sesión, cualquier sección lleva al Inicio; con sesión, se puede refrescar sin perderla.
 - [ ] La cookie de sesión sale con `Secure` (HTTPS) en producción.
-- [ ] Recepción no ve Estadísticas ni el botón "Eliminar"; administración sí.
+- [ ] Recepción no ve Estadísticas, Personal ni el botón "Eliminar"; administración sí.
+- [ ] Crear una cuenta de recepción, entrar con ella, desactivarla y comprobar que se le cierra la sesión.
 
 ## 16. Evolución del proyecto y problemas resueltos
 
@@ -567,13 +616,15 @@ Problemas encontrados (o riesgos previstos) durante el desarrollo y cómo se res
 | Había que recargar la página para ver cambios. | Recarga automática tras cada acción y avisos por Socket.io. |
 | Fotos pesadas. | Se achican en el navegador y se guardan aparte en la colección `fotos`. |
 | Cualquiera con el enlace podía usar la aplicación. | Inicio de sesión con roles (HU 9): JWT en cookie httpOnly y permisos en el servidor. |
+| Las cuentas del personal solo se podían crear con el seed, desde la terminal. | Pantalla Personal (HU 10): administración crea, edita, activa o desactiva cuentas y cambia contraseñas. |
+| Al editar la cuenta propia, el menú seguía mostrando el nombre viejo. | `actualizarUsuario` en `AuthContext` reemplaza los datos en pantalla. |
 | Vulnerabilidades en dependencias (`npm audit`: Mongoose, Engine.IO, body-parser). | `npm audit fix` dentro de las mismas versiones mayores; 0 vulnerabilidades. |
 | Después de "Salir", el login recordaba la última pantalla (la próxima persona caía ahí). | `AuthContext` registra si la sesión se cerró a propósito y `RutaProtegida` no la recuerda en ese caso. |
 
 ## 17. Limitaciones y trabajo futuro
 
-- **Gestión de cuentas del personal** desde la aplicación (HU 10, en curso): hoy solo existe el
-  administrador creado con el seed.
+- **Cerrar las sesiones abiertas al cambiar una contraseña** (hoy hay que desactivar la cuenta para
+  cortar el acceso en el momento).
 - **Paginación** del listado de alumnos (la librería ya está instalada; se pospuso a propósito).
 - **Historial de pagos:** hoy solo se guarda el último pago; podría registrarse cada pago con su monto.
 - **Montos y precios** de cuotas, y reportes de recaudación.
