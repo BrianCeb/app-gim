@@ -18,7 +18,9 @@ router.post('/', async (req, res) => {
             return res.status(404).json({ error: 'Alumno no encontrado' });
         }
 
+        // alumno: el vínculo real (su _id). dni: copia histórica del DNI que tenía ese día
         const nuevo = new Ingreso({
+            alumno: alumno._id,
             dni,
             fecha: new Date()
         });
@@ -26,7 +28,8 @@ router.post('/', async (req, res) => {
         await nuevo.save();
         req.app.get('io')?.emit('ingresos:cambio');
 
-        // Se devuelve también el alumno para mostrar en pantalla su foto y estado de pago
+        // Se devuelve también el alumno para mostrar en pantalla su foto y estado de pago.
+        // En esta respuesta "alumno" es el objeto completo; en GET /api/ingresos es solo su _id
         res.status(201).json({ ...nuevo.toObject(), alumno });
     } catch (error) {
         console.error(' Error al guardar ingreso:', error);
