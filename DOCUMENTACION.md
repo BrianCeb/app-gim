@@ -55,17 +55,19 @@ cuotas e ingresos de un gimnasio, con los datos guardados de forma persistente e
 
 ## 4. Funcionalidades
 
-La aplicación tiene una pantalla pública de **Inicio** y seis secciones que requieren iniciar sesión:
+La aplicación tiene una pantalla pública de **Inicio** y seis secciones que requieren iniciar sesión
+(Ajustes agrupa dos pestañas, Planes y Personal, para que la barra del celular no pase de 6 ítems):
 
 | Sección | Qué permite hacer |
 |---|---|
 | **Inicio** (`/ingresar`) | Propuesta de valor de la aplicación y formulario de ingreso (email y contraseña). Es la única pantalla que se ve sin sesión. |
 | **Panel** | Registrar un ingreso por DNI; ver ingresos del día y cantidad de alumnos al día, por vencer y vencidos; lista de "cuotas a revisar" con botón "Pagó". |
 | **Ingresos** | Registrar ingresos y ver el listado de ingresos de cualquier día (hora, alumno, estado de su cuota). |
-| **Alumnos** | Listado completo; búsqueda por nombre, apellido o DNI (sin importar tildes ni puntos); filtro por estado; alta, edición, eliminación con confirmación, registro de pago y foto. |
-| **Pagos** | Alumnos ordenados por vencimiento (los más urgentes primero), filtro por estado y botón para registrar el pago. |
+| **Alumnos** | Listado completo con el plan de cada alumno; búsqueda por nombre, apellido o DNI (sin importar tildes ni puntos); filtro por estado; alta (con plan obligatorio), edición, eliminación con confirmación, registro de pago y foto. |
+| **Pagos** | Alumnos ordenados por vencimiento (los más urgentes primero), con su plan y precio vigente; filtro por estado y botón para registrar el pago (se puede cambiar de plan al pagar). |
 | **Estadísticas** | Gráfico de barras de ingresos por día (últimos 30 días), promedio diario, total de alumnos y gráfico de torta con el estado de las cuotas. |
-| **Personal** | Cuentas para ingresar a la app: alta (nombre, email, rol y contraseña), edición, activar o desactivar con confirmación y cambio de contraseña. Solo administración. |
+| **Ajustes → Planes** (`/planes`) | Planes de cuota: alta (nombre, duración, precio y días de aviso), edición, activar o desactivar. Muestra cuántos alumnos tiene cada plan. Solo administración. |
+| **Ajustes → Personal** (`/personal`) | Cuentas para ingresar a la app: alta (nombre, email, rol y contraseña), edición, activar o desactivar con confirmación y cambio de contraseña. Solo administración. |
 
 ### Roles del personal
 
@@ -75,9 +77,11 @@ Cada cuenta tiene uno de dos roles. El menú muestra solo las secciones permitid
 |---|---|---|
 | Panel, Ingresos y Pagos | ✔ | ✔ |
 | Ver, crear y editar alumnos; registrar pagos y fotos | ✔ | ✔ |
+| Elegir el plan de un alumno y ver los precios | ✔ | ✔ |
+| Ajustes → Planes (crear, editar, activar o desactivar planes) | — | ✔ |
 | Eliminar alumnos | — | ✔ |
 | Estadísticas | — | ✔ |
-| Personal (gestionar las cuentas) | — | ✔ |
+| Ajustes → Personal (gestionar las cuentas) | — | ✔ |
 
 > Los permisos son un supuesto del equipo, pendiente de confirmar con la dueña del gimnasio.
 
@@ -92,19 +96,44 @@ Además:
 
 ## 5. Reglas de negocio
 
-- La cuota vence **30 días** después de la fecha de pago.
+- El vencimiento depende del **plan de cuota** del alumno (ver "Planes de cuota (HU 11)").
 - Estados de la cuota:
   - **Vencido:** la fecha de vencimiento ya pasó.
-  - **Por vencer:** faltan 3 días o menos.
-  - **Al día:** faltan más de 3 días.
-- **Registrar pago** toma la fecha de hoy (hora de Argentina) por defecto, aunque se puede elegir otra,
-  y recalcula el vencimiento.
+  - **Por vencer:** faltan tantos días o menos como los "días de aviso" del plan (3 en el Mensual).
+  - **Al día:** faltan más días que los de aviso.
+- **Registrar pago** toma la fecha de hoy (hora de Argentina) y el plan del alumno por defecto, aunque
+  se pueden elegir otros, y recalcula el vencimiento.
 - El **DNI** es único por alumno. Se aceptan puntos o espacios ("12.345.678") y se guarda solo con
   números ("12345678"). Debe tener entre 6 y 9 dígitos.
-- Son obligatorios: nombre, apellido, DNI, email válido y fecha de pago.
+- Son obligatorios: nombre, apellido, DNI, email válido, fecha de pago y plan.
 - Un ingreso solo se registra si existe un alumno con ese DNI. El ingreso se registra aunque la cuota
   esté vencida, pero la pantalla lo avisa claramente en rojo.
 - Las fechas se muestran en formato argentino (dd/mm/aaaa).
+
+### Planes de cuota (HU 11)
+Confirmadas por Brian (15/11/2026):
+- Cada plan tiene **nombre** (único, sin distinguir mayúsculas), **duración** (en meses o en días),
+  **precio** vigente (pesos enteros) y **días de aviso** para "por vencer" (por defecto 3 en planes de
+  meses y 1 en planes de días; en un plan de días tiene que ser menor que la duración).
+- **Meses = mes calendario:** 5/11 + 1 mes = 5/12. Si el día no existe en el mes de destino, queda el
+  último día: 31/1 + 1 mes = 28/2 (29/2 en año bisiesto). **Días = días fijos:** semanal = 7 días.
+- **Pago tarde** (el día del vencimiento o después): el período nuevo cuenta desde el día del pago.
+- **Pago adelantado** (antes del vencimiento): el período se suma al vencimiento actual, así no pierde
+  días. Efecto conocido: alguien que arrancó un 31 "baja" de día con los pagos adelantados
+  (31/1 → 28/2 → 28/3), como en cualquier mes calendario.
+- El plan es **obligatorio al dar de alta**. **Cambiar el plan** al editar no toca el vencimiento
+  actual: se aplica desde el próximo pago. También se puede elegir otro plan al registrar el pago, y
+  ese pago ya usa el plan nuevo. Si al editar se corrige la fecha de pago, el vencimiento se recalcula
+  desde esa fecha con el plan del alumno.
+- Los planes los crea y edita **solo administración**; recepción los elige y ve los precios.
+- Los planes **no se borran: se desactivan**. Un plan desactivado no se puede elegir para altas ni
+  para cobrar; los alumnos que lo tenían lo conservan (y su vencimiento) hasta su próximo pago, en el
+  que hay que elegirles otro.
+- Cambiar el precio o la duración de un plan se aplica desde el próximo pago de cada alumno.
+- El precio vigente vive en el plan. Lo que se cobró en cada pago se guardará aparte en la HU 12.
+- Los alumnos cargados antes de la HU 11 quedaron en el plan **Mensual** (1 mes, aviso 3 días, precio
+  $0 hasta que administración cargue el real), sin tocar su vencimiento.
+- Fuera de alcance por ahora: pase diario, control de días por semana y descuentos.
 
 ### Cuentas del personal (HU 10)
 Decididas por el equipo (Sprint 1):
@@ -235,7 +264,8 @@ gimnasio-app/
 │   ├── .env.example        # plantilla sin secretos
 │   ├── scripts/
 │   │   ├── crearAdmin.js           # seed del primer administrador (npm run seed:admin)
-│   │   └── vincularIngresos.js     # migración: vincula ingresos viejos con su alumno (npm run migrar:ingresos)
+│   │   ├── vincularIngresos.js     # migración: vincula ingresos viejos con su alumno (npm run migrar:ingresos)
+│   │   └── migrarPlanes.js         # migración: plan Mensual para los alumnos sin plan (npm run migrar:planes)
 │   └── src/
 │       ├── config/
 │       │   ├── db.js               # conexión a MongoDB
@@ -246,11 +276,15 @@ gimnasio-app/
 │       │   ├── Alumno.js
 │       │   ├── Ingreso.js
 │       │   ├── Foto.js
+│       │   ├── Plan.js
 │       │   └── Usuario.js
+│       ├── utils/
+│       │   └── vencimiento.js      # cálculo del vencimiento según el plan (lógica pura)
 │       └── routes/
 │           ├── auth.router.js      # login, logout, yo
 │           ├── alumnos.router.js
 │           ├── ingresos.router.js
+│           ├── planes.router.js    # planes de cuota (ver: sesión; crear/editar: administración)
 │           └── usuarios.router.js  # cuentas del personal (solo administración)
 └── frontend/
     ├── package.json
@@ -259,11 +293,11 @@ gimnasio-app/
     └── src/
         ├── main.jsx                # rutas de la aplicación
         ├── index.css
-        ├── pages/                  # Inicio, Panel, Ingresos, Alumnos, Pagos, Estadísticas, Personal
-        ├── components/             # Layout, RutaProtegida, AlumnoForm, UsuarioForm, IngresoRapido, RegistrarPago, Modal, ui
+        ├── pages/                  # Inicio, Panel, Ingresos, Alumnos, Pagos, Estadísticas, Planes, Personal
+        ├── components/             # Layout, RutaProtegida, AlumnoForm, UsuarioForm, PlanForm, AjustesTabs, IngresoRapido, RegistrarPago, Modal, ui
         ├── context/                # AuthContext (sesión), DatosContext (datos + Socket.io), AvisosContext (toasts)
         ├── hooks/                  # useAuth (custom hook)
-        └── lib/                    # api.js, permisos.js, fechas.js, alumnos.js, imagen.js
+        └── lib/                    # api.js, permisos.js, fechas.js, alumnos.js, planes.js, imagen.js
 ```
 
 ## 9. Modelo de datos (MongoDB)
@@ -277,7 +311,8 @@ gimnasio-app/
 | `dni` | String | Obligatorio y **único** (índice único). |
 | `email` | String | Obligatorio, se guarda en minúsculas. |
 | `fechaPago` | Date | Obligatoria, guardada a medianoche UTC. |
-| `fechaVencimiento` | Date | Calculada: fechaPago + 30 días. |
+| `fechaVencimiento` | Date | Calculada según el plan (ver reglas de la HU 11). |
+| `plan` | ObjectId | Referencia al plan de cuota (con índice). Obligatorio al dar de alta (lo controla la ruta; en el esquema no es `required` para no romper datos sin migrar). |
 | `fotoUrl` | String | Ruta a la foto (`/api/alumnos/:id/foto?v=...`) o vacío. |
 
 ### Colección `ingresos` (modelo `Ingreso`)
@@ -308,6 +343,28 @@ con el DNI guardado.
 Los ingresos anteriores a este cambio se vinculan una vez con `npm run migrar:ingresos` (ver
 sección 13).
 
+### Colección `plans` (modelo `Plan`)
+Planes de cuota (Mongoose nombra la colección `plans`).
+
+| Campo | Tipo | Detalle |
+|---|---|---|
+| `nombre` | String | Obligatorio, **único** (índice único; la ruta además lo controla sin distinguir mayúsculas). |
+| `duracion.cantidad` | Number | Entero, 1 o más. |
+| `duracion.unidad` | String | `meses` (mes calendario) o `dias` (días fijos). |
+| `precio` | Number | Precio vigente en pesos enteros, 0 o más. |
+| `diasAviso` | Number | Días antes del vencimiento en que el alumno aparece "por vencer". Por defecto 3. |
+| `activo` | Boolean | `true` por defecto. Los planes no se borran: se desactivan. |
+| `createdAt`, `updatedAt` | Date | Las agrega Mongoose. |
+
+**Relación alumno–plan:** cada alumno guarda el `_id` de su plan. La API devuelve los alumnos con el
+plan completo (`populate`: nombre, duración, precio, aviso y estado), porque las pantallas lo
+necesitan para mostrar el precio y calcular el estado de pago.
+
+**Cálculo del vencimiento:** está en `backend/src/utils/vencimiento.js` (`sumarDuracion` y
+`calcularVencimiento`), sin base de datos ni Express, para poder probarlo solo. El frontend tiene el
+mismo cálculo en `lib/fechas.js`, solo para mostrar el vencimiento antes de guardar; el que vale es el
+del servidor.
+
 ### Colección `usuarios` (modelo `Usuario`)
 Cuentas del personal del gimnasio (no de los alumnos).
 
@@ -336,17 +393,20 @@ permiso, **403**.
 | POST | `/api/auth/login` | pública | Iniciar sesión (`email`, `password`); deja la cookie `sesion` | 200, 400, 401 (datos incorrectos), 403 (cuenta desactivada) |
 | POST | `/api/auth/logout` | pública | Cerrar sesión (borra la cookie) | 200 |
 | GET | `/api/auth/yo` | sesión | Usuario de la sesión actual | 200, 401 |
-| GET | `/api/alumnos` | sesión | Lista de alumnos ordenada por apellido y nombre | 200 |
-| POST | `/api/alumnos` | sesión | Crear alumno | 201, 400 (datos inválidos), 409 (DNI repetido) |
+| GET | `/api/alumnos` | sesión | Lista de alumnos ordenada por apellido y nombre, con su plan | 200 |
+| POST | `/api/alumnos` | sesión | Crear alumno (`plan` obligatorio y activo) | 201, 400 (datos inválidos o plan inexistente/inactivo), 409 (DNI repetido) |
 | GET | `/api/alumnos/dni/:dni` | sesión | Buscar alumno por DNI | 200, 404 |
-| PUT | `/api/alumnos/:id` | sesión | Editar alumno (recalcula el vencimiento) | 200, 400, 404, 409 |
+| PUT | `/api/alumnos/:id` | sesión | Editar alumno (`plan` opcional; recalcula el vencimiento solo si cambia la fecha de pago) | 200, 400, 404, 409 |
 | DELETE | `/api/alumnos/:id` | **admin** | Eliminar alumno y su foto | 200, 400 (ID inválido), 403, 404 |
-| POST | `/api/alumnos/:id/pago` | sesión | Registrar pago (`fechaPago` opcional; por defecto hoy) | 200, 400, 404 |
+| POST | `/api/alumnos/:id/pago` | sesión | Registrar pago (`fechaPago` opcional, por defecto hoy; `plan` opcional, por defecto el suyo, tiene que estar activo) | 200, 400, 404 |
 | GET | `/api/alumnos/:id/foto` | sesión | Obtener la foto | 200 (imagen), 404 |
 | PUT | `/api/alumnos/:id/foto` | sesión | Subir foto (`imagen` como data URL base64) | 200, 400, 404, 413 |
 | DELETE | `/api/alumnos/:id/foto` | sesión | Quitar la foto | 200, 404 |
 | GET | `/api/ingresos` | sesión | Lista de ingresos, más recientes primero | 200 |
 | POST | `/api/ingresos` | sesión | Registrar ingreso por `dni`; devuelve también el alumno | 201, 400, 404 |
+| GET | `/api/planes` | sesión | Planes (activos primero, por nombre), incluidos los desactivados | 200 |
+| POST | `/api/planes` | **admin** | Crear plan (`nombre`, `duracion: { cantidad, unidad }`, `precio`, `diasAviso` opcional) | 201, 400, 403, 409 (nombre repetido) |
+| PUT | `/api/planes/:id` | **admin** | Editar plan (mismos campos + `activo`, booleano obligatorio). No hay DELETE: se desactiva | 200, 400, 403, 404, 409 |
 | GET | `/api/usuarios` | **admin** | Cuentas del personal (activas primero, por nombre), sin el hash | 200, 403 |
 | POST | `/api/usuarios` | **admin** | Crear cuenta (`nombre`, `email`, `rol`, `password`) | 201, 400, 403, 409 (email repetido) |
 | PUT | `/api/usuarios/:id` | **admin** | Editar `nombre`, `email`, `rol` y `activo` (booleano, obligatorio) | 200, 400 (datos inválidos o cambio sobre la propia cuenta), 403, 404, 409 (email repetido o último admin) |
@@ -368,12 +428,13 @@ Content-Type: application/json
   "apellido": "Pérez",
   "dni": "12.345.678",
   "email": "juan@ejemplo.com",
-  "fechaPago": "2026-11-01"
+  "fechaPago": "2026-11-01",
+  "plan": "<_id del plan Mensual>"
 }
 ```
 
-Respuesta `201 Created`: el alumno guardado con `_id`, `dni: "12345678"` y
-`fechaVencimiento` = 01/12/2026.
+Respuesta `201 Created`: el alumno guardado con `_id`, `dni: "12345678"`,
+`fechaVencimiento` = 01/12/2026 y el plan completo.
 
 ### Manejo de errores en el servidor
 - Validación propia de los datos antes de guardar (mensajes claros en español).
@@ -416,12 +477,31 @@ Respuesta `201 Created`: el alumno guardado con `_id`, `dni: "12345678"` y
   los casos.
 - **`DatosContext` dentro de la parte protegida:** sin sesión no se piden datos ni se abre el socket;
   al cerrar sesión se desmonta y la conexión se corta.
+- **Planes en `DatosContext`:** a diferencia del personal, los planes los usan varias pantallas
+  (formulario de alumno, registrar pago, Ajustes), así que se cargan junto con alumnos e ingresos. El
+  servidor avisa `planes:cambio` por Socket.io y se recargan planes y alumnos (los alumnos traen el
+  precio y los días de aviso de su plan).
+- **Selector de plan:** muestra "Nombre · $ precio". En el alta, si hay un solo plan activo ya viene
+  elegido. Debajo de la fecha de pago se ve el vencimiento que va a quedar, calculado con las mismas
+  reglas que el servidor; al editar, si se cambia el plan, avisa "El plan nuevo se aplica desde el
+  próximo pago".
+- **Registrar pago:** muestra plan, precio y nuevo vencimiento antes de confirmar; el botón dice el
+  monto ("Registrar $ 25.000") cuando el precio es mayor que 0. Si el plan del alumno se desactivó,
+  pide elegir otro.
+- **Ajustes con pestañas:** Planes y Personal son dos rutas (`/planes`, `/personal`) con pestañas
+  arriba (`AjustesTabs`). El ítem "Ajustes" del menú queda marcado en las dos.
 - **Pantalla Personal:** la lista de cuentas no va en `DatosContext` porque solo la usa esta pantalla:
   se pide al entrar, y recepción nunca la descarga. El formulario de edición no toca la contraseña ni
   el estado activo; cada uno tiene su botón (la contraseña se escribe dos veces, y desactivar pide
   confirmación). En la cuenta propia el rol aparece bloqueado y no está el botón de desactivar.
 - **`actualizarUsuario` en `AuthContext`:** si administración edita su propia cuenta, el menú muestra
   el nombre nuevo sin recargar. Solo cambia los datos en pantalla; la cookie de sesión sigue igual.
+
+### Pantalla Pagos con planes (prototipo de Arquitectura y diseño de interfaces)
+Con la HU 11 cada fila de Pagos muestra, además del vencimiento, el **plan y su precio vigente**
+("Mensual · $ 25.000"): es lo que recepción tiene que cobrar al renovar. El diálogo "Registrar pago"
+muestra el plan (se puede cambiar), el precio, y el **nuevo vencimiento antes de confirmar**
+(visibilidad del estado del sistema y prevención de errores).
 
 ### Pantalla de Inicio (prototipo de Arquitectura y diseño de interfaces)
 
@@ -502,6 +582,10 @@ Requisito: Node.js 22.12 o superior.
    ```bash
    npm run migrar:ingresos --prefix backend -- --aplicar
    ```
+   Crear el plan "Mensual" y asignarlo a los alumnos sin plan (una sola vez; no toca vencimientos):
+   ```bash
+   npm run migrar:planes --prefix backend -- --aplicar
+   ```
 3. Modo desarrollo (dos terminales):
    ```bash
    npm run dev:backend    # API en http://localhost:3000 (se reinicia al guardar)
@@ -532,7 +616,8 @@ variables temporales, que después se pueden borrar).
 
 Si la base de producción es distinta de la de desarrollo y tiene ingresos viejos, correr una vez
 `npm run migrar:ingresos --prefix backend -- --aplicar` desde el mismo *Shell*. En la base actual ya
-se corrió (15/11/2026).
+se corrió (15/11/2026). Lo mismo con `npm run migrar:planes --prefix backend -- --aplicar` (en la
+base actual ya se corrió el 15/11/2026: creó "Mensual" y se lo asignó a 3 alumnos).
 
 El servidor primero verifica `JWT_SECRET`, se conecta a MongoDB y recién después empieza a aceptar
 pedidos; si algo falla, se detiene con un error claro (así el hosting lo detecta y no queda "a medias").
@@ -601,6 +686,36 @@ Probado en local contra la base real:
 | Verificación | Los 2 ingresos apuntan a un alumno cuyo DNI coincide con el guardado |
 | Build del frontend | Sin errores; no quedan usos del cruce por DNI |
 
+### Planes de cuota (HU 11)
+Probado en local contra la base real (script de 40 pedidos; los planes, el alumno, el ingreso y la
+cuenta de prueba se borraron al terminar), 12 casos del cálculo de fechas en el backend y otros 12 en
+el frontend, y en Chrome:
+
+| Prueba | Resultado |
+|---|---|
+| `/api/planes` sin sesión / recepción crea o edita un plan | 401 / 403 |
+| Recepción lista los planes | 200 |
+| Plan sin nombre, unidad inválida, duración 0 o decimal, precio negativo o vacío, aviso ≥ duración en un plan de días | 400 con el mensaje correspondiente |
+| Nombre repetido ("mensual" contra "Mensual") | 409 |
+| Plan sin `diasAviso` | Semanal queda con 1, Trimestral con 3 |
+| `activo` como texto / ID inválido / inexistente / DELETE | 400 / 400 / 404 / 404 (no existe la ruta) |
+| Alta de alumno sin plan, con plan inexistente o inactivo | 400 |
+| Alta con Mensual y pago 31/1/2026 | Vence 28/2/2026; la respuesta trae el plan completo |
+| Editar: cambiar a Semanal | El vencimiento no cambia |
+| Editar: corregir la fecha de pago a 1/2 (Semanal) | Vence 8/2 |
+| Pago tarde (vencía 8/2, paga 10/2, Semanal) | Vence 17/2 |
+| Pago adelantado (vence 17/2, paga 15/2) pasándose a Mensual | Vence 17/3 |
+| Pagar o pasarse a un plan desactivado | 400 "El plan … ya no está activo. Elegí otro." |
+| Editar otros datos de un alumno con plan desactivado | 200, conserva su plan y su vencimiento |
+| Trimestral, pago tarde 30/11/2026 | Vence 28/2/2027 |
+| Registrar un ingreso | El alumno de la respuesta trae su plan |
+| `npm run migrar:planes` sin `--aplicar` / con `--aplicar` / repetido | Informa / crea Mensual y lo asigna a 3 alumnos / no modifica nada; las fechas de los alumnos quedaron idénticas |
+| En pantalla: crear un plan vacío | Mensajes debajo de nombre y precio |
+| En pantalla: elegir "Días" | El aviso sugerido pasa de 3 a 1 |
+| En pantalla: alta de alumno con Semanal y pago 15/11 | "Cada pago cubre 7 días." · "La cuota vence el 22/11/2026." |
+| En pantalla: registrar pago a un alumno vencido / al día (sin confirmar) | Nuevo vencimiento desde hoy (15/12) / sumado al actual (23/11 → 23/12) |
+| En pantalla: Pagos, Alumnos y Ajustes | Plan y precio en cada fila; columna Plan; pestañas Planes/Personal con "Ajustes" marcado en ambas; sin errores en la consola |
+
 Pruebas de aceptación a completar en producción (lista de verificación):
 
 - [ ] La aplicación carga por HTTPS desde un único enlace, en ventana privada y en celular.
@@ -620,6 +735,9 @@ Pruebas de aceptación a completar en producción (lista de verificación):
 - [ ] La cookie de sesión sale con `Secure` (HTTPS) en producción.
 - [ ] Recepción no ve Estadísticas, Personal ni el botón "Eliminar"; administración sí.
 - [ ] Crear una cuenta de recepción, entrar con ella, desactivarla y comprobar que se le cierra la sesión.
+- [ ] Cargar el precio real del plan Mensual y crear los demás planes que use el gimnasio.
+- [ ] Con recepción: elegir el plan al dar de alta y al cobrar; no ve Ajustes.
+- [ ] Con dos pantallas abiertas: cambiar el precio de un plan y verlo actualizado en la otra.
 
 ## 16. Evolución del proyecto y problemas resueltos
 
@@ -651,6 +769,7 @@ Problemas encontrados (o riesgos previstos) durante el desarrollo y cómo se res
 | Las cuentas del personal solo se podían crear con el seed, desde la terminal. | Pantalla Personal (HU 10): administración crea, edita, activa o desactiva cuentas y cambia contraseñas. |
 | Al editar la cuenta propia, el menú seguía mostrando el nombre viejo. | `actualizarUsuario` en `AuthContext` reemplaza los datos en pantalla. |
 | Los ingresos se vinculaban al alumno por DNI: al corregir un DNI, los ingresos anteriores aparecían como "Alumno eliminado". | El ingreso guarda el `_id` del alumno (y el DNI como dato histórico); script de migración para los ingresos viejos. |
+| La cuota vencía siempre a los 30 días: no servía para planes semanales o trimestrales, y "mes" no era mes calendario. | Planes de cuota (HU 11): el vencimiento se calcula según la duración del plan, en meses calendario o días fijos, con reglas para pago adelantado y tarde. |
 | Vulnerabilidades en dependencias (`npm audit`: Mongoose, Engine.IO, body-parser). | `npm audit fix` dentro de las mismas versiones mayores; 0 vulnerabilidades. |
 | Después de "Salir", el login recordaba la última pantalla (la próxima persona caía ahí). | `AuthContext` registra si la sesión se cerró a propósito y `RutaProtegida` no la recuerda en ese caso. |
 
@@ -659,9 +778,10 @@ Problemas encontrados (o riesgos previstos) durante el desarrollo y cómo se res
 - **Cerrar las sesiones abiertas al cambiar una contraseña** (hoy hay que desactivar la cuenta para
   cortar el acceso en el momento).
 - **Paginación** del listado de alumnos (la librería ya está instalada; se pospuso a propósito).
-- **Historial de pagos:** hoy solo se guarda el último pago; podría registrarse cada pago con su monto.
-- **Montos y precios** de cuotas, y reportes de recaudación.
-- Reglas de prórroga, pagos parciales o distintos planes (semanal, trimestral).
+- **Historial de pagos (HU 12):** hoy solo se guarda el último pago; falta registrar cada pago con el
+  monto cobrado y el medio de pago (el precio del plan es el vigente, no lo que se cobró).
+- Reportes de recaudación (HU 13).
+- Reglas de prórroga, pagos parciales, pase diario, control de días por semana y descuentos.
 - Pruebas automatizadas (por ejemplo, con Vitest y Supertest).
 - Bloquear o advertir el ingreso con cuota vencida según lo que decida el gimnasio.
 - Exportar datos a Excel o PDF.

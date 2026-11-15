@@ -31,8 +31,8 @@ No cambiar de framework, librería o versión sin justificarlo y sin aprobación
 
 ## Reglas de negocio vigentes
 
-- La cuota vence 30 días después de la fecha de pago (se va a reemplazar por planes de cuota en la HU 11).
-- Estados: vencido (fecha pasada), por vencer (3 días o menos), al día (más de 3 días).
+- El vencimiento depende del plan de cuota del alumno (HU 11): meses = mes calendario, días = días fijos; pago tarde cuenta desde el pago, pago adelantado se suma al vencimiento actual. Detalle en DOCUMENTACION.md, sección 5.
+- Estados: vencido (fecha pasada), por vencer (faltan los "días de aviso" del plan o menos; 3 en el Mensual), al día (más).
 - DNI único, se guarda solo con números, entre 6 y 9 dígitos.
 - Fechas de pago guardadas a medianoche UTC; se muestran en formato `es-AR`. Ingresos en hora de Argentina.
 - No inventar reglas de negocio (prórrogas, pagos parciales, bloqueos): preguntar a Brian.
