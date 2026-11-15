@@ -4,6 +4,7 @@ import { Wallet } from 'lucide-react';
 import { useDatos } from '../context/DatosContext';
 import { estadoPago, formatearFecha, textoVencimiento } from '../lib/fechas';
 import { nombreCompleto } from '../lib/alumnos';
+import { textoPlan } from '../lib/planes';
 import RegistrarPago from '../components/RegistrarPago';
 import { Avatar, Boton, Cargando, Encabezado, EstadoBadge, EstadoVacio, FiltrosEstado, Tarjeta } from '../components/ui';
 
@@ -59,6 +60,8 @@ export default function PagosPage() {
                                         <p className="text-sm text-slate-500">
                                             {textoVencimiento(dias)} · <span className="tabular-nums">{formatearFecha(alumno.fechaVencimiento)}</span>
                                         </p>
+                                        {/* Plan y precio vigente: lo que hay que cobrarle al renovar */}
+                                        <p className="truncate text-sm text-slate-500">{alumno.plan ? textoPlan(alumno.plan) : 'Sin plan asignado'}</p>
                                     </div>
                                 </div>
                                 <div className="flex w-full items-center justify-between gap-3 sm:w-auto">
