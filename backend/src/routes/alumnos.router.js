@@ -1,11 +1,13 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import Alumno from '../dao/models/Alumno.js';
 import Foto from '../dao/models/Foto.js';
+import Plan from '../dao/models/Plan.js';
+import { calcularVencimiento, sumarDuracion } from '../utils/vencimiento.js';
 import { requireRol } from '../middlewares/auth.js';
 
 const router = express.Router();
 
-const DIAS_CUOTA = 30;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const FOTO_REGEX = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/;
 const FOTO_MAX_BYTES = 600 * 1024;
@@ -23,10 +25,25 @@ function parsearFecha(valor) {
     return new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), fecha.getUTCDate()));
 }
 
-function calcularVencimiento(fechaPago) {
-    const vencimiento = new Date(fechaPago);
-    vencimiento.setUTCDate(vencimiento.getUTCDate() + DIAS_CUOTA);
-    return vencimiento;
+// Campos del plan que viajan junto con cada alumno (para mostrar nombre, precio y estado de pago)
+const CAMPOS_PLAN = 'nombre duracion precio diasAviso activo';
+
+// Completa el plan del alumno (o de una lista de alumnos) con sus datos, en lugar de solo el _id
+function conPlan(consulta) {
+    return consulta.populate('plan', CAMPOS_PLAN);
+}
+
+// Busca el plan elegido. Devuelve { plan } o { error }.
+// Un plan inactivo ya no se ofrece: solo se acepta si es el que el alumno ya tenía (planActualId)
+async function buscarPlan(planId, planActualId = null) {
+    if (!planId) return { error: 'Elegí un plan de cuota.' };
+    const plan = mongoose.isValidObjectId(planId) ? await Plan.findById(planId) : null;
+    if (!plan) return { error: 'El plan elegido no existe.' };
+    const esElActual = planActualId && String(planActualId) === String(plan._id);
+    if (!plan.activo && !esElActual) {
+        return { error: `El plan "${plan.nombre}" ya no está activo. Elegí otro.` };
+    }
+    return { plan };
 }
 
 // Fecha de hoy en Argentina, a medianoche UTC (mismo formato en que se guardan las fechas de pago)
@@ -67,16 +84,8 @@ function validarAlumno(body) {
         return { error: 'La fecha de pago es obligatoria y debe ser válida.' };
     }
 
-    return {
-        datos: {
-            nombre,
-            apellido,
-            dni,
-            email,
-            fechaPago,
-            fechaVencimiento: calcularVencimiento(fechaPago)
-        }
-    };
+    // El vencimiento no se calcula acá: depende del plan (y, al editar, de si cambió la fecha de pago)
+    return { datos: { nombre, apellido, dni, email, fechaPago } };
 }
 
 function responderError(res, error, mensaje) {
@@ -108,7 +117,17 @@ router.post('/', async (req, res) => {
             return res.status(409).json({ error: 'El DNI ya está registrado.' });
         }
 
-        const nuevoAlumno = await Alumno.create(datos);
+        // El plan es obligatorio en el alta y tiene que estar activo
+        const { plan, error: errorPlan } = await buscarPlan(req.body.plan);
+        if (errorPlan) return res.status(400).json({ error: errorPlan });
+
+        // Alta: no hay vencimiento anterior, el período cuenta desde la fecha de pago
+        const nuevoAlumno = await Alumno.create({
+            ...datos,
+            plan: plan._id,
+            fechaVencimiento: calcularVencimiento({ fechaPago: datos.fechaPago, duracion: plan.duracion })
+        });
+        await nuevoAlumno.populate('plan', CAMPOS_PLAN);
         avisarCambio(req);
         res.status(201).json(nuevoAlumno);
     } catch (error) {
@@ -121,7 +140,7 @@ router.post('/', async (req, res) => {
 ================================= */
 router.get('/', async (req, res) => {
     try {
-        const alumnos = await Alumno.find().sort({ apellido: 1, nombre: 1 });
+        const alumnos = await conPlan(Alumno.find().sort({ apellido: 1, nombre: 1 }));
         res.json(alumnos);
     } catch (error) {
         res.status(500).json({ error: 'Error al obtener alumnos' });
@@ -133,7 +152,7 @@ router.get('/', async (req, res) => {
 ================================= */
 router.get('/dni/:dni', async (req, res) => {
     try {
-        const alumno = await Alumno.findOne({ dni: normalizarDni(req.params.dni) });
+        const alumno = await conPlan(Alumno.findOne({ dni: normalizarDni(req.params.dni) }));
         if (!alumno) return res.status(404).json({ error: 'Alumno no encontrado' });
         res.json(alumno);
     } catch (error) {
@@ -160,28 +179,37 @@ router.delete('/:id', requireRol('administracion'), async (req, res) => {
 
 /* ===============================
    📌 EDITAR ALUMNO (PUT)
+   - Cambiar el plan NO cambia el vencimiento actual: el plan nuevo se aplica desde el próximo pago.
+   - Si se corrige la fecha de pago, el vencimiento se recalcula desde esa fecha con el plan del alumno.
 ================================= */
 router.put('/:id', async (req, res) => {
     try {
         const { datos, error } = validarAlumno(req.body);
         if (error) return res.status(400).json({ error });
 
+        const alumno = await Alumno.findById(req.params.id);
+        if (!alumno) return res.status(404).json({ error: 'Alumno no encontrado' });
+
         // El DNI no puede pertenecer a otro alumno
-        const otroConDni = await Alumno.findOne({ dni: datos.dni, _id: { $ne: req.params.id } });
+        const otroConDni = await Alumno.findOne({ dni: datos.dni, _id: { $ne: alumno._id } });
         if (otroConDni) {
             return res.status(409).json({ error: 'El DNI ya está registrado.' });
         }
 
-        const alumnoActualizado = await Alumno.findByIdAndUpdate(req.params.id, datos, {
-            new: true,
-            runValidators: true
-        });
+        // Si no se envía plan, queda el que tenía. Puede conservar un plan inactivo, pero no pasarse a uno
+        const { plan, error: errorPlan } = await buscarPlan(req.body.plan ?? alumno.plan, alumno.plan);
+        if (errorPlan) return res.status(400).json({ error: errorPlan });
 
-        if (!alumnoActualizado)
-            return res.status(404).json({ error: 'Alumno no encontrado' });
+        const cambioFechaPago = datos.fechaPago.getTime() !== alumno.fechaPago.getTime();
+        Object.assign(alumno, datos, { plan: plan._id });
+        if (cambioFechaPago) {
+            alumno.fechaVencimiento = sumarDuracion(datos.fechaPago, plan.duracion);
+        }
+        await alumno.save();
+        await alumno.populate('plan', CAMPOS_PLAN);
 
         avisarCambio(req);
-        res.status(200).json(alumnoActualizado);
+        res.status(200).json(alumno);
     } catch (error) {
         responderError(res, error, 'Error al actualizar alumno');
     }
@@ -189,7 +217,10 @@ router.put('/:id', async (req, res) => {
 
 /* ===============================
    📌 REGISTRAR PAGO (renovar cuota)
-   Usa la fecha enviada o, si no hay, la de hoy en Argentina.
+   - Usa la fecha enviada o, si no hay, la de hoy en Argentina.
+   - Se puede elegir otro plan al pagar (body.plan): este pago ya usa el plan nuevo.
+   - Pago adelantado: el período se suma al vencimiento actual. Pago tarde: cuenta desde el día del pago.
+   - Al pagar, el plan tiene que estar activo (un plan desactivado ya no se cobra).
 ================================= */
 router.post('/:id/pago', async (req, res) => {
     try {
@@ -198,12 +229,21 @@ router.post('/:id/pago', async (req, res) => {
             return res.status(400).json({ error: 'La fecha de pago no es válida.' });
         }
 
-        const alumno = await Alumno.findByIdAndUpdate(
-            req.params.id,
-            { fechaPago, fechaVencimiento: calcularVencimiento(fechaPago) },
-            { new: true }
-        );
+        const alumno = await Alumno.findById(req.params.id);
         if (!alumno) return res.status(404).json({ error: 'Alumno no encontrado' });
+
+        const { plan, error: errorPlan } = await buscarPlan(req.body?.plan ?? alumno.plan);
+        if (errorPlan) return res.status(400).json({ error: errorPlan });
+
+        alumno.fechaVencimiento = calcularVencimiento({
+            fechaPago,
+            duracion: plan.duracion,
+            vencimientoActual: alumno.fechaVencimiento
+        });
+        alumno.fechaPago = fechaPago;
+        alumno.plan = plan._id;
+        await alumno.save();
+        await alumno.populate('plan', CAMPOS_PLAN);
 
         avisarCambio(req);
         res.json(alumno);
@@ -252,6 +292,7 @@ router.put('/:id/foto', async (req, res) => {
         );
         alumno.fotoUrl = `/api/alumnos/${alumno._id}/foto?v=${Date.now()}`;
         await alumno.save();
+        await alumno.populate('plan', CAMPOS_PLAN);
 
         avisarCambio(req);
         res.json(alumno);
@@ -262,7 +303,7 @@ router.put('/:id/foto', async (req, res) => {
 
 router.delete('/:id/foto', async (req, res) => {
     try {
-        const alumno = await Alumno.findByIdAndUpdate(req.params.id, { fotoUrl: '' }, { new: true });
+        const alumno = await conPlan(Alumno.findByIdAndUpdate(req.params.id, { fotoUrl: '' }, { new: true }));
         if (!alumno) return res.status(404).json({ error: 'Alumno no encontrado' });
 
         await Foto.deleteOne({ alumno: alumno._id });
