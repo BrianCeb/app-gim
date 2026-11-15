@@ -13,7 +13,7 @@ gimnasio-app/
 ├── backend/            # API Express
 │   ├── server.js
 │   ├── .env            # NO se sube a git (ver .env.example)
-│   ├── scripts/        # crearAdmin.js (seed del primer administrador)
+│   ├── scripts/        # crearAdmin.js (seed del primer administrador), vincularIngresos.js (migración)
 │   └── src/
 │       ├── config/      # db.js, auth.js (JWT y cookie)
 │       ├── middlewares/ # auth.js: requireAuth, requireRol
@@ -35,6 +35,7 @@ Requisito: Node 22.12 o superior.
 1. Copiá `backend/.env.example` a `backend/.env` y completá `MONGO_URI`, `JWT_SECRET` y los datos del primer administrador (`ADMIN_NOMBRE`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` de 8 caracteres o más). El `.env.example` explica cómo generar `JWT_SECRET`.
 2. Instalá dependencias (una sola vez): `npm install --prefix backend` y `npm install --prefix frontend`.
    Creá el primer administrador (una sola vez): `npm run seed:admin --prefix backend`.
+   Si la base tiene ingresos viejos (guardados solo con DNI), vinculalos con su alumno una vez: `npm run migrar:ingresos --prefix backend -- --aplicar` (sin `--aplicar` solo muestra qué cambiaría).
 3. Abrí **dos terminales**:
    - `npm run dev:backend` → API en http://localhost:3000 (se reinicia sola al guardar).
    - `npm run dev:frontend` → app en **http://localhost:5173** (se recarga sola al guardar).
@@ -52,6 +53,7 @@ La app abre en el **Inicio** (`/ingresar`): ingresá con el email y la contrase�
 - "Registrar pago" usa la fecha de hoy (se puede cambiar) y recalcula el vencimiento.
 - Las fechas se guardan a medianoche UTC y se muestran en formato argentino (dd/mm/aaaa).
 - Las fotos se achican en el navegador (máx. 400 px) y se guardan en MongoDB, en la colección `fotos`.
+- Cada ingreso guarda el `_id` del alumno (y el DNI de ese día): corregir el DNI de un alumno no le hace perder sus ingresos.
 
 ## Roles
 
@@ -102,7 +104,7 @@ Los errores siempre vuelven como JSON: `{ "error": "mensaje para mostrar" }`.
    - **Health Check Path:** `/healthz`
    - **Environment:** `MONGO_URI` = tu URI de Atlas (secreto), `JWT_SECRET` = una clave larga y distinta de la de desarrollo (secreto), `NODE_ENV` = `production` (activa la cookie `Secure`) y `NODE_VERSION` = `22`
    - **Plan:** uno pago (Starter) para que el servicio no se "duerma". El gratuito se apaga tras 15 min sin uso y tarda en despertar.
-4. Primer administrador: en Render → **Shell**, con `ADMIN_NOMBRE`, `ADMIN_EMAIL` y `ADMIN_PASSWORD` cargadas como variables, corré `npm run seed:admin --prefix backend`. Después podés borrar esas tres variables.
+4. Primer administrador: en Render → **Shell**, con `ADMIN_NOMBRE`, `ADMIN_EMAIL` y `ADMIN_PASSWORD` cargadas como variables, corré `npm run seed:admin --prefix backend`. Después podés borrar esas tres variables. Si la base de producción es otra y tiene ingresos viejos, corré también `npm run migrar:ingresos --prefix backend -- --aplicar`.
 5. En MongoDB Atlas → **Network Access**: permití las IP de salida de Render (aparecen en el panel del servicio, en *Connect → Outbound*) o, si no, `0.0.0.0/0` con un usuario de base con contraseña fuerte.
 
 ### Publicar una actualización

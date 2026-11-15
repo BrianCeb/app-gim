@@ -234,7 +234,8 @@ gimnasio-app/
 │   ├── .env                # variables secretas (NO se sube a Git)
 │   ├── .env.example        # plantilla sin secretos
 │   ├── scripts/
-│   │   └── crearAdmin.js           # seed del primer administrador (npm run seed:admin)
+│   │   ├── crearAdmin.js           # seed del primer administrador (npm run seed:admin)
+│   │   └── vincularIngresos.js     # migración: vincula ingresos viejos con su alumno (npm run migrar:ingresos)
 │   └── src/
 │       ├── config/
 │       │   ├── db.js               # conexión a MongoDB
@@ -282,7 +283,8 @@ gimnasio-app/
 ### Colección `ingresos` (modelo `Ingreso`)
 | Campo | Tipo | Detalle |
 |---|---|---|
-| `dni` | String | DNI del alumno que ingresó. |
+| `alumno` | ObjectId | Referencia al alumno que ingresó (con índice). Puede faltar solo en ingresos de alumnos que ya no existían al migrar. |
+| `dni` | String | DNI que tenía el alumno el día que ingresó (dato histórico). |
 | `fecha` | Date | Fecha y hora exacta del ingreso. |
 
 ### Colección `fotos` (modelo `Foto`)
@@ -296,8 +298,15 @@ gimnasio-app/
 sea liviano (no viaja la imagen con cada alumno). El navegador pide la foto solo cuando la muestra, y
 como la URL cambia con cada foto nueva (`?v=...`), se puede guardar en caché por mucho tiempo.
 
-**Relación alumno–ingreso:** se vincula por DNI. Si se elimina un alumno, sus ingresos históricos se
-conservan y se muestran como "Alumno eliminado (DNI ...)".
+**Relación alumno–ingreso:** se vincula por el `_id` del alumno (`ingreso.alumno`), que no cambia
+nunca. Antes se vinculaba por DNI, y si se corregía el DNI de un alumno sus ingresos anteriores
+quedaban "huérfanos" y aparecían como "Alumno eliminado". El ingreso se sigue registrando escribiendo
+el DNI en recepción; el servidor busca al alumno y guarda su `_id` y también el DNI de ese momento.
+Si se elimina un alumno, sus ingresos se conservan y se muestran como "Alumno eliminado (DNI ...)",
+con el DNI guardado.
+
+Los ingresos anteriores a este cambio se vinculan una vez con `npm run migrar:ingresos` (ver
+sección 13).
 
 ### Colección `usuarios` (modelo `Usuario`)
 Cuentas del personal del gimnasio (no de los alumnos).
@@ -488,6 +497,11 @@ Requisito: Node.js 22.12 o superior.
    ```bash
    npm run seed:admin --prefix backend
    ```
+   Si la base tiene ingresos de antes de que se vincularan por `_id`, completarlos (una sola vez;
+   sin `--aplicar` solo muestra qué cambiaría, y repetirlo no modifica nada):
+   ```bash
+   npm run migrar:ingresos --prefix backend -- --aplicar
+   ```
 3. Modo desarrollo (dos terminales):
    ```bash
    npm run dev:backend    # API en http://localhost:3000 (se reinicia al guardar)
@@ -515,6 +529,10 @@ Plataforma prevista: **Render**, con un único *Web Service*:
 El primer administrador de producción se crea una vez con `npm run seed:admin --prefix backend`
 (desde la consola *Shell* de Render, con `ADMIN_NOMBRE`, `ADMIN_EMAIL` y `ADMIN_PASSWORD` cargadas como
 variables temporales, que después se pueden borrar).
+
+Si la base de producción es distinta de la de desarrollo y tiene ingresos viejos, correr una vez
+`npm run migrar:ingresos --prefix backend -- --aplicar` desde el mismo *Shell*. En la base actual ya
+se corrió (15/11/2026).
 
 El servidor primero verifica `JWT_SECRET`, se conecta a MongoDB y recién después empieza a aceptar
 pedidos; si algo falla, se detiene con un error claro (así el hosting lo detecta y no queda "a medias").
@@ -570,6 +588,19 @@ terminar) y en el navegador por el equipo:
 | En pantalla: editar la cuenta propia | Rol bloqueado, sin botón de desactivar; el nombre nuevo aparece en el menú al instante |
 | Barra inferior del celular con los 6 ítems de administración | Se ve bien |
 
+### Ingresos vinculados por `_id` (tarea técnica)
+Probado en local contra la base real:
+
+| Prueba | Resultado |
+|---|---|
+| Ingreso viejo sin `alumno` frente al nuevo esquema | Sigue siendo válido |
+| Registrar un ingreso por DNI | 201; guarda el `_id` del alumno y su DNI (el ingreso de prueba se borró después) |
+| `npm run migrar:ingresos` sin `--aplicar` | Informa 2 ingresos para vincular y no guarda nada |
+| Con `--aplicar` | Vincula los 2 ingresos |
+| Repetirlo | "No hay ingresos sin vincular. No se modificó nada." |
+| Verificación | Los 2 ingresos apuntan a un alumno cuyo DNI coincide con el guardado |
+| Build del frontend | Sin errores; no quedan usos del cruce por DNI |
+
 Pruebas de aceptación a completar en producción (lista de verificación):
 
 - [ ] La aplicación carga por HTTPS desde un único enlace, en ventana privada y en celular.
@@ -579,6 +610,7 @@ Pruebas de aceptación a completar en producción (lista de verificación):
 - [ ] Eliminación con confirmación.
 - [ ] Registrar pago y ver el cambio de estado.
 - [ ] Registrar ingreso por DNI (existente y no existente).
+- [ ] Corregir el DNI de un alumno con ingresos: en Ingresos sigue apareciendo con su nombre.
 - [ ] Subir y quitar foto.
 - [ ] Refrescar la página en cualquier sección.
 - [ ] Los errores se muestran de forma comprensible (por ejemplo, DNI repetido).
@@ -618,6 +650,7 @@ Problemas encontrados (o riesgos previstos) durante el desarrollo y cómo se res
 | Cualquiera con el enlace podía usar la aplicación. | Inicio de sesión con roles (HU 9): JWT en cookie httpOnly y permisos en el servidor. |
 | Las cuentas del personal solo se podían crear con el seed, desde la terminal. | Pantalla Personal (HU 10): administración crea, edita, activa o desactiva cuentas y cambia contraseñas. |
 | Al editar la cuenta propia, el menú seguía mostrando el nombre viejo. | `actualizarUsuario` en `AuthContext` reemplaza los datos en pantalla. |
+| Los ingresos se vinculaban al alumno por DNI: al corregir un DNI, los ingresos anteriores aparecían como "Alumno eliminado". | El ingreso guarda el `_id` del alumno (y el DNI como dato histórico); script de migración para los ingresos viejos. |
 | Vulnerabilidades en dependencias (`npm audit`: Mongoose, Engine.IO, body-parser). | `npm audit fix` dentro de las mismas versiones mayores; 0 vulnerabilidades. |
 | Después de "Salir", el login recordaba la última pantalla (la próxima persona caía ahí). | `AuthContext` registra si la sesión se cerró a propósito y `RutaProtegida` no la recuerda en ese caso. |
 
