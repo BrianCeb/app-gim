@@ -1,19 +1,20 @@
-import { NavLink, Outlet } from 'react-router-dom';
-import { ChartColumn, Dumbbell, LayoutDashboard, LogIn, LogOut, RefreshCw, UserCog, Users, Wallet, WifiOff } from 'lucide-react';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { ChartColumn, Dumbbell, LayoutDashboard, LogIn, LogOut, RefreshCw, Settings, Users, Wallet, WifiOff } from 'lucide-react';
 import { useDatos } from '../context/DatosContext';
 import { useAvisos } from '../context/AvisosContext';
 import { useAuth } from '../hooks/useAuth';
 import { ETIQUETA_ROL, puede } from '../lib/permisos';
 import { Boton, BotonIcono } from './ui';
 
-// permiso: si la sección está restringida (ver lib/permisos.js). Sin permiso = la ven todos los roles
+// permiso: si la sección está restringida (ver lib/permisos.js). Sin permiso = la ven todos los roles.
+// rutas: otras rutas que también marcan la sección como activa (Ajustes tiene las pestañas Planes y Personal)
 const SECCIONES = [
     { a: '/', etiqueta: 'Panel', icono: LayoutDashboard },
     { a: '/ingresos', etiqueta: 'Ingresos', icono: LogIn },
     { a: '/alumnos', etiqueta: 'Alumnos', icono: Users },
     { a: '/pagos', etiqueta: 'Pagos', icono: Wallet },
     { a: '/estadisticas', etiqueta: 'Estadísticas', icono: ChartColumn, permiso: 'estadisticas' },
-    { a: '/personal', etiqueta: 'Personal', icono: UserCog, permiso: 'personal' }
+    { a: '/planes', etiqueta: 'Ajustes', icono: Settings, permiso: 'planes', rutas: ['/personal'] }
 ];
 
 function Marca() {
@@ -47,6 +48,10 @@ function AvisoConexion() {
 export default function Layout() {
     const { usuario, salir } = useAuth();
     const avisar = useAvisos();
+    const { pathname } = useLocation();
+
+    // Activa si es su ruta (isActive de NavLink) o una de sus otras rutas
+    const estaActiva = (seccion, isActive) => isActive || (seccion.rutas?.includes(pathname) ?? false);
 
     // Cada rol ve solo las secciones que puede usar
     const secciones = SECCIONES.filter((s) => puede(usuario, s.permiso));
@@ -65,21 +70,24 @@ export default function Layout() {
                     <Marca />
                 </div>
                 <nav className="mt-10 flex flex-col gap-1" aria-label="Secciones">
-                    {secciones.map(({ a, etiqueta, icono: Icono }) => (
-                        <NavLink
-                            key={a}
-                            to={a}
-                            end={a === '/'}
-                            className={({ isActive }) =>
-                                `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
-                                    isActive ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'
-                                }`
-                            }
-                        >
-                            <Icono className="size-5" aria-hidden />
-                            {etiqueta}
-                        </NavLink>
-                    ))}
+                    {secciones.map((seccion) => {
+                        const { a, etiqueta, icono: Icono } = seccion;
+                        return (
+                            <NavLink
+                                key={a}
+                                to={a}
+                                end={a === '/'}
+                                className={({ isActive }) =>
+                                    `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+                                        estaActiva(seccion, isActive) ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                                    }`
+                                }
+                            >
+                                <Icono className="size-5" aria-hidden />
+                                {etiqueta}
+                            </NavLink>
+                        );
+                    })}
                 </nav>
 
                 {/* Quién está usando la app y botón para salir */}
@@ -120,19 +128,22 @@ export default function Layout() {
                 style={{ gridTemplateColumns: `repeat(${secciones.length}, minmax(0, 1fr))` }}
                 className="fixed inset-x-0 bottom-0 z-30 grid border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden"
             >
-                {secciones.map(({ a, etiqueta, icono: Icono }) => (
-                    <NavLink
-                        key={a}
-                        to={a}
-                        end={a === '/'}
-                        className={({ isActive }) =>
-                            `flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium ${isActive ? 'text-slate-900' : 'text-slate-400'}`
-                        }
-                    >
-                        <Icono className="size-5" aria-hidden />
-                        {etiqueta}
-                    </NavLink>
-                ))}
+                {secciones.map((seccion) => {
+                    const { a, etiqueta, icono: Icono } = seccion;
+                    return (
+                        <NavLink
+                            key={a}
+                            to={a}
+                            end={a === '/'}
+                            className={({ isActive }) =>
+                                `flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium ${estaActiva(seccion, isActive) ? 'text-slate-900' : 'text-slate-400'}`
+                            }
+                        >
+                            <Icono className="size-5" aria-hidden />
+                            {etiqueta}
+                        </NavLink>
+                    );
+                })}
             </nav>
         </div>
     );

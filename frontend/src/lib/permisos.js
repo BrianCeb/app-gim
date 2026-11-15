@@ -16,7 +16,9 @@ export const ETIQUETA_ROL = {
 const PERMISOS = {
     estadisticas: [ROLES.ADMINISTRACION],
     eliminarAlumno: [ROLES.ADMINISTRACION],
-    personal: [ROLES.ADMINISTRACION]
+    personal: [ROLES.ADMINISTRACION],
+    // Crear y editar planes de cuota (verlos y elegirlos lo hacen todos)
+    planes: [ROLES.ADMINISTRACION]
 };
 
 // puede(usuario, 'estadisticas') → true / false. Sin permiso indicado: alcanza con haber iniciado sesión

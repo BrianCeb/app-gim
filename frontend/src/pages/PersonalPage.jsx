@@ -6,6 +6,7 @@ import { api } from '../lib/api';
 import { ETIQUETA_ROL, ROLES } from '../lib/permisos';
 import UsuarioForm, { CambiarPasswordForm } from '../components/UsuarioForm';
 import { Confirmacion, Modal } from '../components/Modal';
+import AjustesTabs from '../components/AjustesTabs';
 import { Boton, BotonIcono, Cargando, Encabezado, EstadoVacio, Tarjeta } from '../components/ui';
 
 // Etiquetas de rol y de estado, para que se distingan de un vistazo
@@ -23,7 +24,7 @@ function BadgeEstado({ activo }) {
 }
 
 /* ===============================
-   👥 PERSONAL (solo administración)
+   👥 PERSONAL (Ajustes, solo administración)
    La lista no está en DatosContext porque solo la usa esta pantalla: se carga al entrar.
    Las cuentas no se borran: se desactivan y se pueden volver a activar.
 ================================= */
@@ -112,14 +113,17 @@ export default function PersonalPage() {
 
     return (
         <>
-            <Encabezado
-                titulo="Personal"
-                descripcion={cargando ? 'Cuentas para ingresar a la app' : `${activas} ${activas === 1 ? 'cuenta activa' : 'cuentas activas'} de ${cuentas.length}`}
-            >
-                <Boton onClick={() => setFormulario('nueva')} className="w-full sm:w-auto">
+            <Encabezado titulo="Ajustes" descripcion="Planes de cuota y cuentas del personal" />
+            <AjustesTabs />
+
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-slate-500">
+                    {cargando ? 'Cuentas para ingresar a la app.' : `${activas} ${activas === 1 ? 'cuenta activa' : 'cuentas activas'} de ${cuentas.length}.`}
+                </p>
+                <Boton onClick={() => setFormulario('nueva')} className="w-full shrink-0 sm:w-auto">
                     <UserPlus className="size-4" aria-hidden /> Nueva cuenta
                 </Boton>
-            </Encabezado>
+            </div>
 
             <Tarjeta className="overflow-hidden">
                 {cargando ? (
