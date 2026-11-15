@@ -49,12 +49,14 @@ export function DatosProvider({ children }) {
         return () => socket.disconnect();
     }, [recargarTodo, recargarAlumnos, recargarIngresos]);
 
-    const alumnosPorDni = useMemo(() => new Map(alumnos.map((a) => [a.dni, a])), [alumnos]);
+    // Alumnos por _id, para encontrar en un paso el alumno de cada ingreso (ingreso.alumno es su _id).
+    // useMemo: el Map se arma de nuevo solo cuando cambia la lista de alumnos
+    const alumnosPorId = useMemo(() => new Map(alumnos.map((a) => [a._id, a])), [alumnos]);
 
     const valor = {
         alumnos,
         ingresos,
-        alumnosPorDni,
+        alumnosPorId,
         cargando,
         error,
         recargarAlumnos,

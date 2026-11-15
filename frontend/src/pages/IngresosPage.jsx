@@ -7,7 +7,7 @@ import IngresoRapido from '../components/IngresoRapido';
 import { Avatar, Cargando, Encabezado, EstadoBadge, EstadoVacio, Tarjeta, claseInput } from '../components/ui';
 
 export default function IngresosPage() {
-    const { ingresos, alumnosPorDni, cargando } = useDatos();
+    const { ingresos, alumnosPorId, cargando } = useDatos();
     const [dia, setDia] = useState(hoyISO());
 
     // Los ingresos ya vienen ordenados del más reciente al más antiguo
@@ -51,7 +51,9 @@ export default function IngresosPage() {
                     ) : (
                         <ul className="divide-y divide-slate-100">
                             {delDia.map((ingreso) => {
-                                const alumno = alumnosPorDni.get(ingreso.dni);
+                                // Se busca por _id: aunque se corrija el DNI del alumno, sus ingresos lo siguen
+                                // encontrando. Si no aparece (se eliminó), se muestra el DNI que tenía ese día
+                                const alumno = alumnosPorId.get(ingreso.alumno);
                                 return (
                                     <li key={ingreso._id} className="flex items-center gap-3 px-5 py-3">
                                         <span className="w-12 shrink-0 text-sm font-medium text-slate-500 tabular-nums">{formatearHora(ingreso.fecha)}</span>
