@@ -46,5 +46,11 @@ export const api = {
     eliminarFoto: (id) => pedir(`/api/alumnos/${id}/foto`, { method: 'DELETE' }),
 
     ingresos: () => pedir('/api/ingresos'),
-    registrarIngreso: (dni) => pedir('/api/ingresos', { method: 'POST', body: { dni } })
+    registrarIngreso: (dni) => pedir('/api/ingresos', { method: 'POST', body: { dni } }),
+
+    // Cuentas del personal (solo administración; con otro rol la API responde 403)
+    usuarios: () => pedir('/api/usuarios'),
+    crearUsuario: (datos) => pedir('/api/usuarios', { method: 'POST', body: datos }),
+    editarUsuario: (id, datos) => pedir(`/api/usuarios/${id}`, { method: 'PUT', body: datos }),
+    cambiarPassword: (id, password) => pedir(`/api/usuarios/${id}/password`, { method: 'PUT', body: { password } })
 };
