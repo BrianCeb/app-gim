@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
 import { Camera, CircleAlert, Trash2 } from 'lucide-react';
 import { api } from '../lib/api';
-import { DIAS_CUOTA, fechaAISO, formatearFecha, hoyISO, sumarDias } from '../lib/fechas';
+import { fechaAISO, formatearFecha, hoyISO, sumarDuracion } from '../lib/fechas';
+import { textoDuracion, textoPlan } from '../lib/planes';
 import { achicarImagen } from '../lib/imagen';
 import { normalizarDni, validarAlumno } from '../lib/alumnos';
 import { useDatos } from '../context/DatosContext';
@@ -10,7 +11,7 @@ import { Boton, Campo, claseInput } from './ui';
 
 // Formulario para crear (alumno = null) o editar un alumno, incluida su foto
 export default function AlumnoForm({ alumno, onTerminar }) {
-    const { recargarAlumnos } = useDatos();
+    const { recargarAlumnos, planesActivos } = useDatos();
     const avisar = useAvisos();
     const inputFoto = useRef(null);
 
@@ -19,13 +20,20 @@ export default function AlumnoForm({ alumno, onTerminar }) {
         apellido: alumno?.apellido ?? '',
         dni: alumno?.dni ?? '',
         email: alumno?.email ?? '',
-        fechaPago: alumno ? fechaAISO(alumno.fechaPago) : hoyISO()
+        fechaPago: alumno ? fechaAISO(alumno.fechaPago) : hoyISO(),
+        // Alta: si hay un solo plan, ya viene elegido. Edición: el plan que tiene el alumno
+        plan: alumno?.plan?._id ?? (planesActivos.length === 1 ? planesActivos[0]._id : '')
     });
     const [errores, setErrores] = useState({});
     const [errorGeneral, setErrorGeneral] = useState('');
     const [guardando, setGuardando] = useState(false);
     // foto: null = sin cambios, { dataUrl } = foto nueva, { quitar: true } = borrar la actual
     const [foto, setFoto] = useState(null);
+
+    // Opciones del selector: los planes activos y, si el alumno tiene uno que ya no se ofrece, también ese
+    const planActualInactivo = alumno?.plan && !alumno.plan.activo ? alumno.plan : null;
+    const opcionesPlan = planActualInactivo ? [...planesActivos, planActualInactivo] : planesActivos;
+    const planElegido = opcionesPlan.find((p) => p._id === datos.plan);
 
     const vistaPrevia = foto?.dataUrl ?? (foto?.quitar ? null : alumno?.fotoUrl || null);
 
@@ -134,11 +142,18 @@ export default function AlumnoForm({ alumno, onTerminar }) {
                 <Campo etiqueta="Email" error={errores.email}>
                     <input type="email" value={datos.email} onChange={cambiar('email')} autoComplete="off" className={claseInput(errores.email)} />
                 </Campo>
-                <Campo
-                    etiqueta="Fecha de pago"
-                    error={errores.fechaPago}
-                    ayuda={datos.fechaPago && `La cuota vence el ${formatearFecha(sumarDias(datos.fechaPago, DIAS_CUOTA))}.`}
-                >
+                <Campo etiqueta="Plan" error={errores.plan} ayuda={planElegido && `Cada pago cubre ${textoDuracion(planElegido.duracion)}.`}>
+                    <select value={datos.plan} onChange={cambiar('plan')} className={claseInput(errores.plan)}>
+                        <option value="">Elegí un plan…</option>
+                        {opcionesPlan.map((p) => (
+                            <option key={p._id} value={p._id}>
+                                {textoPlan(p)}
+                                {p.activo ? '' : ' (ya no se ofrece)'}
+                            </option>
+                        ))}
+                    </select>
+                </Campo>
+                <Campo etiqueta="Fecha de pago" error={errores.fechaPago} ayuda={textoVence(alumno, datos, planElegido)}>
                     <input type="date" value={datos.fechaPago} onChange={cambiar('fechaPago')} className={claseInput(errores.fechaPago)} />
                 </Campo>
             </div>
@@ -153,4 +168,18 @@ export default function AlumnoForm({ alumno, onTerminar }) {
             </div>
         </form>
     );
+}
+
+// Texto de ayuda con el vencimiento que va a quedar (mismas reglas que el backend):
+// - Alta: desde la fecha de pago, con la duración del plan.
+// - Edición: si se corrige la fecha de pago, se recalcula; si no, queda el vencimiento actual
+//   (cambiar de plan se aplica desde el próximo pago).
+function textoVence(alumno, datos, plan) {
+    if (!datos.fechaPago || !plan) return null;
+    const cambioFecha = alumno && datos.fechaPago !== fechaAISO(alumno.fechaPago);
+    if (!alumno || cambioFecha) {
+        return `La cuota vence el ${formatearFecha(sumarDuracion(datos.fechaPago, plan.duracion))}.`;
+    }
+    const cambioPlan = datos.plan !== alumno.plan?._id;
+    return `Vence el ${formatearFecha(alumno.fechaVencimiento)}.${cambioPlan ? ' El plan nuevo se aplica desde el próximo pago.' : ''}`;
 }
