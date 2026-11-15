@@ -6,11 +6,18 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
+import cookieParser from 'cookie-parser';
 
 // 🧩 conexión a Mongo
 import connectDB from './src/config/db.js';
 
+// 🧩 sesión
+import { NOMBRE_COOKIE, verificarConfigAuth, verificarToken } from './src/config/auth.js';
+import { requireAuth } from './src/middlewares/auth.js';
+import Usuario from './src/dao/models/Usuario.js';
+
 // 🧩 rutas
+import authRouter from './src/routes/auth.router.js';
 import alumnosRouter from './src/routes/alumnos.router.js';
 import ingresosRouter from './src/routes/ingresos.router.js';
 
@@ -28,16 +35,33 @@ const httpServer = createServer(app);
 const io = new Server(httpServer);
 app.set('io', io);
 
+// 🔐 Socket.io solo acepta conexiones con una sesión válida (la misma cookie que usa la API).
+// cookie-parser también lee la cookie del pedido inicial (handshake) del socket.
+io.engine.use(cookieParser());
+io.use(async (socket, next) => {
+    try {
+        const datos = verificarToken(socket.request.cookies?.[NOMBRE_COOKIE]);
+        const usuario = datos && (await Usuario.findById(datos.sub));
+        if (!usuario || !usuario.activo) return next(new Error('No autorizado'));
+        next();
+    } catch {
+        next(new Error('No autorizado'));
+    }
+});
+
 io.on('connection', () => {
     console.log('Cliente conectado');
 });
 
 // 🧱 middlewares (límite de 1mb para permitir fotos en base64)
 app.use(express.json({ limit: '1mb' }));
+app.use(cookieParser()); // deja las cookies en req.cookies (ahí viaja el token de sesión)
 
 // 📚 rutas
-app.use('/api/alumnos', alumnosRouter);
-app.use('/api/ingresos', ingresosRouter);
+// /api/auth es pública (login y logout); el resto exige haber iniciado sesión
+app.use('/api/auth', authRouter);
+app.use('/api/alumnos', requireAuth, alumnosRouter);
+app.use('/api/ingresos', requireAuth, ingresosRouter);
 
 // ❓ rutas /api inexistentes: responder JSON, nunca HTML
 app.use('/api', (req, res) => {
@@ -81,9 +105,10 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: 'Error interno del servidor' });
 });
 
-// 🚀 arrancar: primero la base de datos, después recibir tráfico
+// 🚀 arrancar: primero la configuración y la base de datos, después recibir tráfico
 const PORT = process.env.PORT || 3000;
 try {
+    verificarConfigAuth();
     await connectDB();
     httpServer.listen(PORT, '0.0.0.0', () =>
         console.log(`✅ Servidor corriendo en http://0.0.0.0:${PORT}`)

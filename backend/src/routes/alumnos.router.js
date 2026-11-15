@@ -1,6 +1,7 @@
 import express from 'express';
 import Alumno from '../dao/models/Alumno.js';
 import Foto from '../dao/models/Foto.js';
+import { requireRol } from '../middlewares/auth.js';
 
 const router = express.Router();
 
@@ -141,9 +142,10 @@ router.get('/dni/:dni', async (req, res) => {
 });
 
 /* ===============================
-   📌 ELIMINAR ALUMNO POR ID
+   📌 ELIMINAR ALUMNO POR ID (solo administración)
+   requireAuth ya se aplicó en server.js para todo /api/alumnos
 ================================= */
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireRol('administracion'), async (req, res) => {
     try {
         const alumnoEliminado = await Alumno.findByIdAndDelete(req.params.id);
         if (!alumnoEliminado)
@@ -219,8 +221,9 @@ router.get('/:id/foto', async (req, res) => {
         const foto = await Foto.findOne({ alumno: req.params.id });
         if (!foto) return res.status(404).json({ error: 'El alumno no tiene foto' });
 
-        // La URL lleva ?v=..., que cambia con cada foto nueva, así que se puede cachear mucho tiempo
-        res.set('Cache-Control', 'public, max-age=31536000, immutable');
+        // La URL lleva ?v=..., que cambia con cada foto nueva, así que se puede cachear mucho tiempo.
+        // private: solo la guarda el navegador de quien inició sesión, nunca un caché compartido
+        res.set('Cache-Control', 'private, max-age=31536000, immutable');
         res.type(foto.contentType).send(foto.data);
     } catch (error) {
         responderError(res, error, 'Error al obtener la foto');

@@ -39,6 +39,12 @@ export function DatosProvider({ children }) {
         socket.on('ingresos:cambio', () => recargarIngresos().catch(() => {}));
         // Si se cortó la conexión y volvió, puede haberse perdido algún aviso
         socket.io.on('reconnect', recargarTodo);
+        // El servidor rechaza el socket si la sesión ya no es válida (venció o desactivaron la cuenta).
+        // Se consulta /yo: si responde 401, api.js avisa a AuthContext y se cierra la sesión en pantalla.
+        // Así hay un solo camino para "sesión terminada", sea por la API o por el socket.
+        socket.on('connect_error', (err) => {
+            if (err.message === 'No autorizado') api.yo().catch(() => {});
+        });
 
         return () => socket.disconnect();
     }, [recargarTodo, recargarAlumnos, recargarIngresos]);

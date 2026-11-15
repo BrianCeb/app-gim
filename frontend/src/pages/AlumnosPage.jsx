@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react';
 import { Pencil, Search, Trash2, UserPlus, Users, Wallet } from 'lucide-react';
 import { useDatos } from '../context/DatosContext';
 import { useAvisos } from '../context/AvisosContext';
+import { useAuth } from '../hooks/useAuth';
 import { api } from '../lib/api';
+import { puede } from '../lib/permisos';
 import { estadoPago, formatearFecha } from '../lib/fechas';
 import { nombreCompleto, normalizarDni, textoBuscable } from '../lib/alumnos';
 import AlumnoForm from '../components/AlumnoForm';
@@ -13,6 +15,9 @@ import { Avatar, Boton, BotonIcono, Cargando, Encabezado, EstadoBadge, EstadoVac
 export default function AlumnosPage() {
     const { alumnos, cargando, recargarAlumnos } = useDatos();
     const avisar = useAvisos();
+    const { usuario } = useAuth();
+    // Recepción no ve el botón; igual la API responde 403 si alguien intenta eliminar
+    const puedeEliminar = puede(usuario, 'eliminarAlumno');
 
     const [busqueda, setBusqueda] = useState('');
     const [filtro, setFiltro] = useState('todos');
@@ -63,9 +68,11 @@ export default function AlumnosPage() {
             <BotonIcono etiqueta="Editar" onClick={() => setFormulario(alumno)}>
                 <Pencil className="size-4.5" />
             </BotonIcono>
-            <BotonIcono etiqueta="Eliminar" onClick={() => setEliminando(alumno)} className="hover:bg-rose-50 hover:text-rose-600">
-                <Trash2 className="size-4.5" />
-            </BotonIcono>
+            {puedeEliminar && (
+                <BotonIcono etiqueta="Eliminar" onClick={() => setEliminando(alumno)} className="hover:bg-rose-50 hover:text-rose-600">
+                    <Trash2 className="size-4.5" />
+                </BotonIcono>
+            )}
         </div>
     );
 
