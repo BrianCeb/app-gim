@@ -110,6 +110,7 @@ function armarPago({ alumno, plan, fecha, medio, usuario, anterior = {} }) {
         usuario: usuario._id,
         usuarioNombre: usuario.nombre,
         fechaPagoAnterior: anterior.fechaPago ?? null,
+        planAnterior: anterior.plan ?? null,
         vencimientoAnterior: anterior.fechaVencimiento ?? null,
         vencimientoNuevo: alumno.fechaVencimiento
     };
@@ -282,7 +283,7 @@ router.post('/:id/pago', async (req, res) => {
         if (errorPlan) return res.status(400).json({ error: errorPlan });
 
         // Se anota cómo estaba antes de pagar, para poder anular este pago si fue un error
-        const anterior = { fechaPago: alumno.fechaPago, fechaVencimiento: alumno.fechaVencimiento };
+        const anterior = { fechaPago: alumno.fechaPago, fechaVencimiento: alumno.fechaVencimiento, plan: alumno.plan };
 
         alumno.fechaVencimiento = calcularVencimiento({
             fechaPago,

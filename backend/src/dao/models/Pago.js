@@ -31,6 +31,8 @@ const pagoSchema = new mongoose.Schema(
         // Cómo estaba el alumno antes del pago y cómo quedó. Los "anteriores" permiten anular el pago
         // y devolverlo exactamente al estado previo. En el alta no hay estado previo: quedan vacíos.
         fechaPagoAnterior: { type: Date, default: null },
+        // Al pagar se puede cambiar de plan: si se anula, el alumno vuelve también al plan que tenía
+        planAnterior: { type: mongoose.Schema.Types.ObjectId, ref: 'Plan', default: null },
         vencimientoAnterior: { type: Date, default: null },
         vencimientoNuevo: { type: Date, required: true },
 
