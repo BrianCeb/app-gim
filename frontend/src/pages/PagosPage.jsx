@@ -1,36 +1,25 @@
 import { useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { Wallet } from 'lucide-react';
+import { History, Wallet } from 'lucide-react';
 import { useDatos } from '../context/DatosContext';
-import { estadoPago, formatearFecha, textoVencimiento } from '../lib/fechas';
+import { useFiltroEstado } from '../hooks/useFiltroEstado';
+import { formatearFecha, textoVencimiento } from '../lib/fechas';
 import { nombreCompleto } from '../lib/alumnos';
 import { textoPlan } from '../lib/planes';
 import RegistrarPago from '../components/RegistrarPago';
+import HistorialPagos from '../components/HistorialPagos';
 import { Avatar, Boton, Cargando, Encabezado, EstadoBadge, EstadoVacio, FiltrosEstado, Tarjeta } from '../components/ui';
-
-const FILTROS_VALIDOS = ['todos', 'vencido', 'porVencer', 'alDia'];
 
 export default function PagosPage() {
     const { alumnos, cargando } = useDatos();
-    const [parametros, setParametros] = useSearchParams();
     const [pagando, setPagando] = useState(null);
+    const [viendoHistorial, setViendoHistorial] = useState(null);
 
-    // El filtro vive en la URL (?estado=vencido) para poder llegar directo desde el Panel
-    const filtro = FILTROS_VALIDOS.includes(parametros.get('estado')) ? parametros.get('estado') : 'todos';
-    const cambiarFiltro = (valor) => setParametros(valor === 'todos' ? {} : { estado: valor }, { replace: true });
+    // Custom hook: estado de cada alumno, conteos y filtro. enUrl: el filtro vive en la dirección
+    // (?estado=vencido) para poder llegar directo desde el Panel
+    const { filtrados, conteos, filtro, cambiarFiltro } = useFiltroEstado(alumnos, { enUrl: true });
 
-    const conEstado = useMemo(
-        () => alumnos.map((a) => ({ alumno: a, ...estadoPago(a) })).sort((a, b) => a.dias - b.dias),
-        [alumnos]
-    );
-
-    const conteos = useMemo(() => {
-        const c = { todos: conEstado.length, alDia: 0, porVencer: 0, vencido: 0 };
-        conEstado.forEach(({ clave }) => c[clave]++);
-        return c;
-    }, [conEstado]);
-
-    const visibles = filtro === 'todos' ? conEstado : conEstado.filter((x) => x.clave === filtro);
+    // Primero los más urgentes: menos días para el vencimiento (los vencidos tienen días negativos)
+    const visibles = useMemo(() => [...filtrados].sort((a, b) => a.dias - b.dias), [filtrados]);
 
     return (
         <>
@@ -66,9 +55,23 @@ export default function PagosPage() {
                                 </div>
                                 <div className="flex w-full items-center justify-between gap-3 sm:w-auto">
                                     <EstadoBadge alumno={alumno} />
-                                    <Boton variante={dias < 0 ? 'primario' : 'secundario'} className="py-2" onClick={() => setPagando(alumno)}>
-                                        Registrar pago
-                                    </Boton>
+                                    <div className="flex gap-2">
+                                        {/* En celular solo el ícono (el texto no entra al lado de "Registrar pago");
+                                            aria-label y title dicen "Historial" igual */}
+                                        <Boton
+                                            variante="secundario"
+                                            className="px-3 py-2 sm:px-4"
+                                            onClick={() => setViendoHistorial(alumno)}
+                                            aria-label="Historial de pagos"
+                                            title="Historial de pagos"
+                                        >
+                                            <History className="size-4" aria-hidden />
+                                            <span className="hidden sm:inline">Historial</span>
+                                        </Boton>
+                                        <Boton variante={dias < 0 ? 'primario' : 'secundario'} className="py-2" onClick={() => setPagando(alumno)}>
+                                            Registrar pago
+                                        </Boton>
+                                    </div>
                                 </div>
                             </li>
                         ))}
@@ -77,6 +80,7 @@ export default function PagosPage() {
             </Tarjeta>
 
             {pagando && <RegistrarPago alumno={pagando} onCerrar={() => setPagando(null)} />}
+            {viendoHistorial && <HistorialPagos alumno={viendoHistorial} onCerrar={() => setViendoHistorial(null)} />}
         </>
     );
 }

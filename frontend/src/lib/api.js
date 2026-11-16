@@ -38,11 +38,16 @@ export const api = {
     yo: () => pedir('/api/auth/yo'),
 
     alumnos: () => pedir('/api/alumnos'),
+    // El alta es el primer pago: datos incluye plan y medio de pago (HU 12)
     crearAlumno: (datos) => pedir('/api/alumnos', { method: 'POST', body: datos }),
     editarAlumno: (id, datos) => pedir(`/api/alumnos/${id}`, { method: 'PUT', body: datos }),
     eliminarAlumno: (id) => pedir(`/api/alumnos/${id}`, { method: 'DELETE' }),
-    // plan: el plan con el que paga (puede ser otro distinto del que tenía)
-    registrarPago: (id, fechaPago, plan) => pedir(`/api/alumnos/${id}/pago`, { method: 'POST', body: { fechaPago, plan } }),
+    // plan: el plan con el que paga (puede ser otro distinto del que tenía); medio: efectivo, transferencia...
+    // Devuelve el alumno renovado y, en "pago", el registro que quedó en el historial
+    registrarPago: (id, fechaPago, plan, medio) =>
+        pedir(`/api/alumnos/${id}/pago`, { method: 'POST', body: { fechaPago, plan, medio } }),
+    // Historial de pagos del alumno, del más reciente al más viejo (incluye los anulados)
+    historialPagos: (id) => pedir(`/api/alumnos/${id}/pagos`),
     subirFoto: (id, imagen) => pedir(`/api/alumnos/${id}/foto`, { method: 'PUT', body: { imagen } }),
     eliminarFoto: (id) => pedir(`/api/alumnos/${id}/foto`, { method: 'DELETE' }),
 
@@ -53,6 +58,9 @@ export const api = {
     planes: () => pedir('/api/planes'),
     crearPlan: (datos) => pedir('/api/planes', { method: 'POST', body: datos }),
     editarPlan: (id, datos) => pedir(`/api/planes/${id}`, { method: 'PUT', body: datos }),
+
+    // Anular un pago (solo administración y solo el último del alumno; si no, la API responde 403 o 409)
+    anularPago: (id) => pedir(`/api/pagos/${id}/anular`, { method: 'POST' }),
 
     // Cuentas del personal (solo administración; con otro rol la API responde 403)
     usuarios: () => pedir('/api/usuarios'),

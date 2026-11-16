@@ -8,7 +8,7 @@ const VARIANTES_BOTON = {
     primario: 'bg-slate-900 text-white hover:bg-slate-700 disabled:bg-slate-400',
     secundario: 'bg-white text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50 disabled:text-slate-400',
     peligro: 'bg-rose-600 text-white hover:bg-rose-500 disabled:bg-rose-300',
-    exito: 'bg-emerald-600 text-white hover:bg-emerald-500 disabled:bg-emerald-300'
+    exito: 'bg-emerald-700 text-white hover:bg-emerald-600 disabled:bg-emerald-300'
 };
 
 export function Boton({ variante = 'primario', cargando = false, className = '', children, ...props }) {
@@ -150,7 +150,7 @@ export function FiltrosEstado({ valor, onCambio, conteos }) {
                     }`}
                 >
                     {etiqueta}
-                    <span className={`ml-1.5 ${valor === clave ? 'text-slate-300' : 'text-slate-400'}`}>{conteos[clave]}</span>
+                    <span className={`ml-1.5 ${valor === clave ? 'text-slate-300' : 'text-slate-500'}`}>{conteos[clave]}</span>
                 </button>
             ))}
         </div>

@@ -154,7 +154,7 @@ export default function PersonalPage() {
                                         <td className="px-5 py-3">
                                             <p className={`font-medium ${cuenta.activo ? 'text-slate-900' : 'text-slate-500'}`}>
                                                 {cuenta.nombre}
-                                                {cuenta._id === usuario._id && <span className="ml-2 text-xs font-normal text-slate-400">(vos)</span>}
+                                                {cuenta._id === usuario._id && <span className="ml-2 text-xs font-normal text-slate-500">(vos)</span>}
                                             </p>
                                             <p className="truncate text-slate-500">{cuenta.email}</p>
                                         </td>
@@ -177,7 +177,7 @@ export default function PersonalPage() {
                                     <div className="min-w-0">
                                         <p className={`truncate font-medium ${cuenta.activo ? 'text-slate-900' : 'text-slate-500'}`}>
                                             {cuenta.nombre}
-                                            {cuenta._id === usuario._id && <span className="ml-2 text-xs font-normal text-slate-400">(vos)</span>}
+                                            {cuenta._id === usuario._id && <span className="ml-2 text-xs font-normal text-slate-500">(vos)</span>}
                                         </p>
                                         <p className="truncate text-sm text-slate-500">{cuenta.email}</p>
                                     </div>

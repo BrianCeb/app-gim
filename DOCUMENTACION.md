@@ -63,8 +63,8 @@ La aplicación tiene una pantalla pública de **Inicio** y seis secciones que re
 | **Inicio** (`/ingresar`) | Propuesta de valor de la aplicación y formulario de ingreso (email y contraseña). Es la única pantalla que se ve sin sesión. |
 | **Panel** | Registrar un ingreso por DNI; ver ingresos del día y cantidad de alumnos al día, por vencer y vencidos; lista de "cuotas a revisar" con botón "Pagó". |
 | **Ingresos** | Registrar ingresos y ver el listado de ingresos de cualquier día (hora, alumno, estado de su cuota). |
-| **Alumnos** | Listado completo con el plan de cada alumno; búsqueda por nombre, apellido o DNI (sin importar tildes ni puntos); filtro por estado; alta (con plan obligatorio), edición, eliminación con confirmación, registro de pago y foto. |
-| **Pagos** | Alumnos ordenados por vencimiento (los más urgentes primero), con su plan y precio vigente; filtro por estado y botón para registrar el pago (se puede cambiar de plan al pagar). |
+| **Alumnos** | Listado completo con el plan de cada alumno; búsqueda por nombre, apellido o DNI (sin importar tildes ni puntos); filtro por estado; alta (con plan y medio del primer pago obligatorios), edición, eliminación con confirmación, registro de pago y foto. |
+| **Pagos** | Alumnos ordenados por vencimiento (los más urgentes primero), con su plan y precio vigente; filtro por estado; botón para registrar el pago con su medio (se puede cambiar de plan al pagar) y botón **Historial** con todos los pagos del alumno (HU 12). |
 | **Estadísticas** | Gráfico de barras de ingresos por día (últimos 30 días), promedio diario, total de alumnos y gráfico de torta con el estado de las cuotas. |
 | **Ajustes → Planes** (`/planes`) | Planes de cuota: alta (nombre, duración, precio y días de aviso), edición, activar o desactivar. Muestra cuántos alumnos tiene cada plan. Solo administración. |
 | **Ajustes → Personal** (`/personal`) | Cuentas para ingresar a la app: alta (nombre, email, rol y contraseña), edición, activar o desactivar con confirmación y cambio de contraseña. Solo administración. |
@@ -78,6 +78,8 @@ Cada cuenta tiene uno de dos roles. El menú muestra solo las secciones permitid
 | Panel, Ingresos y Pagos | ✔ | ✔ |
 | Ver, crear y editar alumnos; registrar pagos y fotos | ✔ | ✔ |
 | Elegir el plan de un alumno y ver los precios | ✔ | ✔ |
+| Ver el historial de pagos de un alumno | ✔ | ✔ |
+| Anular el último pago de un alumno | — | ✔ |
 | Ajustes → Planes (crear, editar, activar o desactivar planes) | — | ✔ |
 | Eliminar alumnos | — | ✔ |
 | Estadísticas | — | ✔ |
@@ -102,7 +104,8 @@ Además:
   - **Por vencer:** faltan tantos días o menos como los "días de aviso" del plan (3 en el Mensual).
   - **Al día:** faltan más días que los de aviso.
 - **Registrar pago** toma la fecha de hoy (hora de Argentina) y el plan del alumno por defecto, aunque
-  se pueden elegir otros, y recalcula el vencimiento.
+  se pueden elegir otros, pide el medio de pago y recalcula el vencimiento. Cada pago queda en el
+  historial (ver "Historial de pagos (HU 12)").
 - El **DNI** es único por alumno. Se aceptan puntos o espacios ("12.345.678") y se guarda solo con
   números ("12345678"). Debe tener entre 6 y 9 dígitos.
 - Son obligatorios: nombre, apellido, DNI, email válido, fecha de pago y plan.
@@ -130,10 +133,34 @@ Confirmadas por Brian (15/11/2026):
   para cobrar; los alumnos que lo tenían lo conservan (y su vencimiento) hasta su próximo pago, en el
   que hay que elegirles otro.
 - Cambiar el precio o la duración de un plan se aplica desde el próximo pago de cada alumno.
-- El precio vigente vive en el plan. Lo que se cobró en cada pago se guardará aparte en la HU 12.
+- El precio vigente vive en el plan. Lo que se cobró en cada pago se guarda aparte, en el historial
+  (HU 12).
 - Los alumnos cargados antes de la HU 11 quedaron en el plan **Mensual** (1 mes, aviso 3 días, precio
   $0 hasta que administración cargue el real), sin tocar su vencimiento.
 - Fuera de alcance por ahora: pase diario, control de días por semana y descuentos.
+
+### Historial de pagos (HU 12)
+Confirmadas por Brian (16/11/2026):
+- **Cada pago queda registrado** en la colección `pagos`: alumno, fecha, plan, monto cobrado, medio de
+  pago, quién lo registró y el vencimiento que dejó. El alumno sigue guardando su último pago y su
+  vencimiento, para que las pantallas los lean rápido.
+- **Medios de pago:** lista fija: efectivo, transferencia, débito y crédito. Es obligatorio al cobrar
+  y en el alta. No viene elegido de antemano, para que quede cómo pagó de verdad.
+- **Monto = precio del plan** en ese momento, y no se edita (sin descuentos ni pagos parciales). Se
+  guarda una copia: si después cambia el precio, lo cobrado no cambia.
+- **El alta es el primer pago:** también pide el medio y queda en el historial.
+- **Anular:** solo administración, y solo el **último pago vigente** de un alumno. El alumno vuelve
+  a la fecha de pago, al vencimiento y al plan que tenía antes de ese pago. El pago **no se borra**:
+  queda marcado como anulado (con fecha y quién lo anuló) y se ve tachado. Se pueden anular varios,
+  siempre del último hacia atrás.
+- **El pago del alta no se anula** (no hay un estado anterior al que volver): si el alta estuvo mal,
+  se corrige desde "Editar alumno" o se elimina el alumno. *Regla propuesta por el equipo de
+  desarrollo, pendiente de confirmar.*
+- **Si se elimina un alumno, sus pagos se conservan**, con una copia de su nombre y DNI: cuentan para
+  la recaudación (HU 13).
+- Los alumnos cargados antes de la HU 12 **arrancan con el historial vacío**: de esos pagos no se sabe
+  el monto ni el medio, y no se inventan registros.
+- El historial lo ven los dos roles, desde el botón "Historial" de Pagos.
 
 ### Cuentas del personal (HU 10)
 Decididas por el equipo (Sprint 1):
@@ -277,6 +304,7 @@ gimnasio-app/
 │       │   ├── Ingreso.js
 │       │   ├── Foto.js
 │       │   ├── Plan.js
+│       │   ├── Pago.js             # historial de pagos (HU 12)
 │       │   └── Usuario.js
 │       ├── utils/
 │       │   └── vencimiento.js      # cálculo del vencimiento según el plan (lógica pura)
@@ -285,6 +313,7 @@ gimnasio-app/
 │           ├── alumnos.router.js
 │           ├── ingresos.router.js
 │           ├── planes.router.js    # planes de cuota (ver: sesión; crear/editar: administración)
+│           ├── pagos.router.js     # anular un pago (solo administración)
 │           └── usuarios.router.js  # cuentas del personal (solo administración)
 └── frontend/
     ├── package.json
@@ -294,10 +323,10 @@ gimnasio-app/
         ├── main.jsx                # rutas de la aplicación
         ├── index.css
         ├── pages/                  # Inicio, Panel, Ingresos, Alumnos, Pagos, Estadísticas, Planes, Personal
-        ├── components/             # Layout, RutaProtegida, AlumnoForm, UsuarioForm, PlanForm, AjustesTabs, IngresoRapido, RegistrarPago, Modal, ui
+        ├── components/             # Layout, RutaProtegida, AlumnoForm, UsuarioForm, PlanForm, AjustesTabs, IngresoRapido, RegistrarPago, SelectorMedio, HistorialPagos, Modal, ui
         ├── context/                # AuthContext (sesión), DatosContext (datos + Socket.io), AvisosContext (toasts)
-        ├── hooks/                  # useAuth (custom hook)
-        └── lib/                    # api.js, permisos.js, fechas.js, alumnos.js, planes.js, imagen.js
+        ├── hooks/                  # custom hooks: useAuth, useHistorialPagos, useFiltroEstado
+        └── lib/                    # api.js, permisos.js, fechas.js, alumnos.js, planes.js, pagos.js, imagen.js
 ```
 
 ## 9. Modelo de datos (MongoDB)
@@ -365,6 +394,39 @@ necesitan para mostrar el precio y calcular el estado de pago.
 mismo cálculo en `lib/fechas.js`, solo para mostrar el vencimiento antes de guardar; el que vale es el
 del servidor.
 
+### Colección `pagos` (modelo `Pago`, HU 12)
+Un documento por cada pago registrado: es el historial y la base de la recaudación (HU 13).
+
+| Campo | Tipo | Detalle |
+|---|---|---|
+| `alumno` | ObjectId | Referencia al alumno (con índice, para traer rápido su historial). |
+| `alumnoNombre`, `alumnoDni` | String | Copia de cómo era el alumno ese día: el pago se sigue entendiendo aunque se elimine el alumno. |
+| `fecha` | Date | Fecha del pago, a medianoche UTC. |
+| `plan`, `planNombre` | ObjectId, String | Plan con el que pagó y una copia de su nombre. |
+| `monto` | Number | Lo cobrado: el precio del plan ese día, en pesos enteros. |
+| `medio` | String | `efectivo`, `transferencia`, `debito` o `credito`. |
+| `usuario`, `usuarioNombre` | ObjectId, String | Cuenta del personal que lo registró. |
+| `fechaPagoAnterior`, `vencimientoAnterior`, `planAnterior` | Date, Date, ObjectId | Cómo estaba el alumno antes de este pago. Sirven para anularlo. En el pago del alta quedan en `null`. |
+| `vencimientoNuevo` | Date | Vencimiento que dejó el pago. |
+| `anulado` | Objeto | `fecha`, `usuario` y `usuarioNombre` de la anulación. Vacío si el pago está vigente. |
+| `vigente` | (virtual) | `true` si no fue anulado. No se guarda: Mongoose lo calcula y lo incluye en el JSON. |
+| `createdAt`, `updatedAt` | Date | Las agrega Mongoose. El historial se ordena por `createdAt`. |
+
+**Decisión de diseño: copias además de referencias.** En una base relacional se guardaría solo el
+`_id` del alumno y del plan. Acá el pago es un **registro histórico**: tiene que mostrar lo que pasó
+ese día aunque después se elimine el alumno, se renombre el plan o cambie el precio. Por eso guarda el
+`_id` (para vincular) y también una copia de los datos que se muestran.
+
+**Transacciones:** registrar un pago cambia dos documentos (el alumno y el pago nuevo), y anularlo
+también (el pago y el alumno). Se guardan dentro de una **transacción de MongoDB**
+(`mongoose.connection.transaction`): se guardan los dos o ninguno. Así nunca queda un alumno renovado
+sin su pago en el historial, ni un pago anulado con el alumno sin restaurar. MongoDB Atlas lo permite
+porque siempre funciona como *replica set*.
+
+**¿Por qué solo se anula el último?** Cada pago guarda cómo estaba el alumno justo antes. Si se anulan
+en orden (del último hacia atrás), volver al estado anterior siempre es correcto. Anular uno del medio
+obligaría a recalcular todos los que vinieron después.
+
 ### Colección `usuarios` (modelo `Usuario`)
 Cuentas del personal del gimnasio (no de los alumnos).
 
@@ -394,11 +456,13 @@ permiso, **403**.
 | POST | `/api/auth/logout` | pública | Cerrar sesión (borra la cookie) | 200 |
 | GET | `/api/auth/yo` | sesión | Usuario de la sesión actual | 200, 401 |
 | GET | `/api/alumnos` | sesión | Lista de alumnos ordenada por apellido y nombre, con su plan | 200 |
-| POST | `/api/alumnos` | sesión | Crear alumno (`plan` obligatorio y activo) | 201, 400 (datos inválidos o plan inexistente/inactivo), 409 (DNI repetido) |
+| POST | `/api/alumnos` | sesión | Crear alumno (`plan` obligatorio y activo; `medio` obligatorio). Registra el primer pago en el historial | 201, 400 (datos inválidos, plan inexistente/inactivo o sin medio), 409 (DNI repetido) |
 | GET | `/api/alumnos/dni/:dni` | sesión | Buscar alumno por DNI | 200, 404 |
 | PUT | `/api/alumnos/:id` | sesión | Editar alumno (`plan` opcional; recalcula el vencimiento solo si cambia la fecha de pago) | 200, 400, 404, 409 |
-| DELETE | `/api/alumnos/:id` | **admin** | Eliminar alumno y su foto | 200, 400 (ID inválido), 403, 404 |
-| POST | `/api/alumnos/:id/pago` | sesión | Registrar pago (`fechaPago` opcional, por defecto hoy; `plan` opcional, por defecto el suyo, tiene que estar activo) | 200, 400, 404 |
+| DELETE | `/api/alumnos/:id` | **admin** | Eliminar alumno y su foto (sus pagos se conservan) | 200, 400 (ID inválido), 403, 404 |
+| POST | `/api/alumnos/:id/pago` | sesión | Registrar pago (`medio` obligatorio; `fechaPago` opcional, por defecto hoy; `plan` opcional, por defecto el suyo, tiene que estar activo). Devuelve el alumno y, en `pago`, el registro del historial | 200, 400, 404 |
+| GET | `/api/alumnos/:id/pagos` | sesión | Historial de pagos del alumno, del más reciente al más viejo (incluye los anulados) | 200, 400, 404 |
+| POST | `/api/pagos/:id/anular` | **admin** | Anular el último pago vigente del alumno (el alumno vuelve al estado anterior) | 200, 400 (ID inválido), 403, 404, 409 (no es el último, ya anulado o es el del alta) |
 | GET | `/api/alumnos/:id/foto` | sesión | Obtener la foto | 200 (imagen), 404 |
 | PUT | `/api/alumnos/:id/foto` | sesión | Subir foto (`imagen` como data URL base64) | 200, 400, 404, 413 |
 | DELETE | `/api/alumnos/:id/foto` | sesión | Quitar la foto | 200, 404 |
@@ -429,12 +493,13 @@ Content-Type: application/json
   "dni": "12.345.678",
   "email": "juan@ejemplo.com",
   "fechaPago": "2026-11-01",
-  "plan": "<_id del plan Mensual>"
+  "plan": "<_id del plan Mensual>",
+  "medio": "efectivo"
 }
 ```
 
 Respuesta `201 Created`: el alumno guardado con `_id`, `dni: "12345678"`,
-`fechaVencimiento` = 01/12/2026 y el plan completo.
+`fechaVencimiento` = 01/12/2026 y el plan completo. Además queda su primer pago en `pagos`.
 
 ### Manejo de errores en el servidor
 - Validación propia de los datos antes de guardar (mensajes claros en español).
@@ -488,6 +553,24 @@ Respuesta `201 Created`: el alumno guardado con `_id`, `dni: "12345678"`,
 - **Registrar pago:** muestra plan, precio y nuevo vencimiento antes de confirmar; el botón dice el
   monto ("Registrar $ 25.000") cuando el precio es mayor que 0. Si el plan del alumno se desactivó,
   pide elegir otro.
+- **Custom hooks propios (`hooks/`):** además de `useAuth`, hay dos que juntan lógica que se repetía
+  o que ensuciaba los componentes:
+  - `useHistorialPagos(alumnoId)` trae el historial y devuelve `{ pagos, cargando, error, recargar,
+    anulable }`. Descarta la respuesta si cambió el alumno antes de que llegue (así no se ve un instante
+    el historial de otro). `anulable` aplica las mismas reglas que el servidor: el último vigente, y no
+    el del alta.
+  - `useFiltroEstado(alumnos, { enUrl })` calcula el estado de cada alumno, las cantidades por estado y
+    el filtro elegido. Antes ese código estaba copiado en Pagos y en Alumnos. En Pagos el filtro vive en
+    la dirección (`?estado=vencido`, para llegar desde el Panel); en Alumnos, solo en memoria.
+- **Medio de pago con botones (`SelectorMedio`):** 4 botones grandes en vez de una lista desplegable:
+  se ven todas las opciones y se eligen con un toque (más rápido en el mostrador y en el celular).
+  Funcionan como un grupo de radio (`role="radiogroup"`, `aria-checked`) para lectores de pantalla.
+- **Registrar pago (HU 12):** debajo del medio aparece **"A cobrar $ X"** en grande. El aviso final dice
+  el monto y el medio ("Pago de $ 25.000 en efectivo registrado…").
+- **Historial (`HistorialPagos`):** fecha y monto arriba y en negrita (lo primero que se busca); abajo
+  plan, medio, hasta cuándo cubre y quién lo registró. Los anulados se ven tachados, con quién y cuándo
+  los anuló. La confirmación de anular aparece dentro del mismo modal (no una ventana sobre otra) y dice
+  a qué fecha vuelve el vencimiento.
 - **Ajustes con pestañas:** Planes y Personal son dos rutas (`/planes`, `/personal`) con pestañas
   arriba (`AjustesTabs`). El ítem "Ajustes" del menú queda marcado en las dos.
 - **Pantalla Personal:** la lista de cuentas no va en `DatosContext` porque solo la usa esta pantalla:
@@ -502,6 +585,12 @@ Con la HU 11 cada fila de Pagos muestra, además del vencimiento, el **plan y su
 ("Mensual · $ 25.000"): es lo que recepción tiene que cobrar al renovar. El diálogo "Registrar pago"
 muestra el plan (se puede cambiar), el precio, y el **nuevo vencimiento antes de confirmar**
 (visibilidad del estado del sistema y prevención de errores).
+
+### Pantalla Pagos con historial (HU 12)
+Cada fila de Pagos suma el botón **Historial**. Al cobrar se elige el medio y se ve el monto a cobrar.
+Para la materia: *visibilidad del estado del sistema* (monto y nuevo vencimiento antes de confirmar),
+*control y libertad* (anular un error), *prevención de errores* (solo se ofrece anular el pago que se
+puede anular, con confirmación) y *reconocer antes que recordar* (todos los medios visibles a la vez).
 
 ### Pantalla de Inicio (prototipo de Arquitectura y diseño de interfaces)
 
@@ -716,6 +805,38 @@ el frontend, y en Chrome:
 | En pantalla: registrar pago a un alumno vencido / al día (sin confirmar) | Nuevo vencimiento desde hoy (15/12) / sumado al actual (23/11 → 23/12) |
 | En pantalla: Pagos, Alumnos y Ajustes | Plan y precio en cada fila; columna Plan; pestañas Planes/Personal con "Ajustes" marcado en ambas; sin errores en la consola |
 
+### Historial de pagos (HU 12)
+Probado en local contra la base real con scripts y en Chrome, con un alumno de prueba (el alumno y
+sus pagos se borraron al terminar):
+
+| Prueba | Resultado |
+|---|---|
+| Alta / pago sin `medio` | 400 "Elegí el medio de pago (efectivo, transferencia, débito o crédito)." |
+| Alta con efectivo (pago 1/11, Mensual) | 201, vence 1/12; queda 1 pago con anteriores en `null` |
+| Pago adelantado con transferencia (16/11) | 200, vence 1/1/2027; la respuesta trae `pago` con monto y medio |
+| `GET /api/alumnos/:id/pagos` | 2 pagos del más reciente al más viejo, con vencimiento anterior y nuevo correctos |
+| Historial con ID inválido | 400 |
+| Anular un pago que no es el último | 409 "Solo se puede anular el último pago del alumno." |
+| Anular el último | 200; el alumno vuelve a la fecha de pago y al vencimiento anteriores |
+| Anularlo otra vez | 409 "Este pago ya estaba anulado." |
+| Anular el siguiente (ahora es el último) | 200; el alumno vuelve al estado del alta |
+| Anular el pago del alta | 409 |
+| Anular con ID inválido / inexistente / sin sesión | 400 / 404 / 401 |
+| Anular con rol recepción | 403 (probado sobre el middleware `requireRol`) |
+| Historial al final | 2 anulados y el alta vigente: los pagos anulados no se borran |
+| Eliminar el alumno | 200; sus pagos siguen en la colección |
+| `lib/pagos.js` contra `Pago.js` | Las dos listas de medios coinciden |
+| En pantalla: alta sin elegir medio | "Elegí el medio de pago." debajo de los botones, en rojo |
+| En pantalla: alta con Efectivo | Se ve "Primer pago: $ X. Queda en el historial de pagos." y el alumno aparece en Pagos |
+| En pantalla: cobrar sin medio / con Transferencia | Error debajo de los botones / aviso "Pago de $ 0 en transferencia registrado. … al día hasta el 16/01/2027." |
+| En pantalla: Historial | 2 pagos, el más nuevo con "Anular este pago"; el del alta sin el botón |
+| En pantalla: anular | Confirmación dentro del modal con el vencimiento al que vuelve; el pago queda tachado con "Anulado el … por …"; la fila de Pagos vuelve a 16/12/2026 |
+| En pantalla: `/pagos?estado=vencido` | Llega ya filtrado (Vencidos 1); filtros y conteos de Alumnos siguen funcionando |
+| En pantalla, 375 px de ancho | Historial queda solo con ícono para que "Registrar pago" entre en una línea; sin errores en la consola |
+
+Pendiente de probar: volver al **plan anterior** al anular (hace falta un segundo plan activo) y
+anular con una cuenta real de recepción.
+
 Pruebas de aceptación a completar en producción (lista de verificación):
 
 - [ ] La aplicación carga por HTTPS desde un único enlace, en ventana privada y en celular.
@@ -738,6 +859,9 @@ Pruebas de aceptación a completar en producción (lista de verificación):
 - [ ] Cargar el precio real del plan Mensual y crear los demás planes que use el gimnasio.
 - [ ] Con recepción: elegir el plan al dar de alta y al cobrar; no ve Ajustes.
 - [ ] Con dos pantallas abiertas: cambiar el precio de un plan y verlo actualizado en la otra.
+- [ ] Cobrar con cada medio de pago y verlo en el historial con el monto correcto.
+- [ ] Con administración: anular el último pago y ver que el vencimiento vuelve al anterior.
+- [ ] Con recepción: ver el historial, sin el botón "Anular".
 
 ## 16. Evolución del proyecto y problemas resueltos
 
@@ -771,6 +895,7 @@ Problemas encontrados (o riesgos previstos) durante el desarrollo y cómo se res
 | Los ingresos se vinculaban al alumno por DNI: al corregir un DNI, los ingresos anteriores aparecían como "Alumno eliminado". | El ingreso guarda el `_id` del alumno (y el DNI como dato histórico); script de migración para los ingresos viejos. |
 | La cuota vencía siempre a los 30 días: no servía para planes semanales o trimestrales, y "mes" no era mes calendario. | Planes de cuota (HU 11): el vencimiento se calcula según la duración del plan, en meses calendario o días fijos, con reglas para pago adelantado y tarde. |
 | Vulnerabilidades en dependencias (`npm audit`: Mongoose, Engine.IO, body-parser). | `npm audit fix` dentro de las mismas versiones mayores; 0 vulnerabilidades. |
+| Solo se guardaba el último pago: no se sabía cuánto se cobró ni cómo, y un pago cargado por error no se podía deshacer. | Historial de pagos (HU 12): colección `pagos` con monto, medio y quién lo registró; anulación del último pago, con transacción. |
 | Después de "Salir", el login recordaba la última pantalla (la próxima persona caía ahí). | `AuthContext` registra si la sesión se cerró a propósito y `RutaProtegida` no la recuerda en ese caso. |
 
 ## 17. Limitaciones y trabajo futuro
@@ -778,8 +903,8 @@ Problemas encontrados (o riesgos previstos) durante el desarrollo y cómo se res
 - **Cerrar las sesiones abiertas al cambiar una contraseña** (hoy hay que desactivar la cuenta para
   cortar el acceso en el momento).
 - **Paginación** del listado de alumnos (la librería ya está instalada; se pospuso a propósito).
-- **Historial de pagos (HU 12):** hoy solo se guarda el último pago; falta registrar cada pago con el
-  monto cobrado y el medio de pago (el precio del plan es el vigente, no lo que se cobró).
+- **Editar la fecha de pago** desde "Editar alumno" cambia el vencimiento, pero no el historial: es
+  una corrección de datos, no un pago. Si se usa mucho, convendría corregir desde el historial.
 - Reportes de recaudación (HU 13).
 - Reglas de prórroga, pagos parciales, pase diario, control de días por semana y descuentos.
 - Pruebas automatizadas (por ejemplo, con Vitest y Supertest).
@@ -819,4 +944,6 @@ CORS y hizo la aplicación más fiable para su uso real en el gimnasio.
 - **Middleware:** función de Express que se ejecuta antes de la ruta y puede dejar pasar o cortar el
   pedido (por ejemplo, `requireAuth`).
 - **Custom hook:** función propia que empieza con `use` y reúne hooks de React para reutilizarlos
-  (por ejemplo, `useAuth`).
+  (por ejemplo, `useAuth`, `useHistorialPagos` y `useFiltroEstado`).
+- **Transacción:** grupo de cambios en la base que se guardan todos juntos o ninguno (si uno falla, se
+  deshacen los demás).

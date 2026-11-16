@@ -2,12 +2,14 @@ import { useRef, useState } from 'react';
 import { Camera, CircleAlert, Trash2 } from 'lucide-react';
 import { api } from '../lib/api';
 import { fechaAISO, formatearFecha, hoyISO, sumarDuracion } from '../lib/fechas';
-import { textoDuracion, textoPlan } from '../lib/planes';
+import { formatearPrecio, textoDuracion, textoPlan } from '../lib/planes';
+import { validarMedio } from '../lib/pagos';
 import { achicarImagen } from '../lib/imagen';
 import { normalizarDni, validarAlumno } from '../lib/alumnos';
 import { useDatos } from '../context/DatosContext';
 import { useAvisos } from '../context/AvisosContext';
 import { Boton, Campo, claseInput } from './ui';
+import SelectorMedio from './SelectorMedio';
 
 // Formulario para crear (alumno = null) o editar un alumno, incluida su foto
 export default function AlumnoForm({ alumno, onTerminar }) {
@@ -24,6 +26,9 @@ export default function AlumnoForm({ alumno, onTerminar }) {
         // Alta: si hay un solo plan, ya viene elegido. Edición: el plan que tiene el alumno
         plan: alumno?.plan?._id ?? (planesActivos.length === 1 ? planesActivos[0]._id : '')
     });
+    // Solo en el alta: el alta es el primer pago y queda en el historial con su medio (HU 12).
+    // Al editar no se pide: editar no es cobrar
+    const [medio, setMedio] = useState('');
     const [errores, setErrores] = useState({});
     const [errorGeneral, setErrorGeneral] = useState('');
     const [guardando, setGuardando] = useState(false);
@@ -59,11 +64,12 @@ export default function AlumnoForm({ alumno, onTerminar }) {
         setErrorGeneral('');
 
         const nuevosErrores = validarAlumno(datos);
+        if (!alumno && validarMedio(medio)) nuevosErrores.medio = validarMedio(medio);
         setErrores(nuevosErrores);
         if (Object.keys(nuevosErrores).length > 0) return;
 
         setGuardando(true);
-        const cuerpo = { ...datos, dni: normalizarDni(datos.dni) };
+        const cuerpo = { ...datos, dni: normalizarDni(datos.dni), ...(alumno ? {} : { medio }) };
         let guardado;
         try {
             guardado = alumno ? await api.editarAlumno(alumno._id, cuerpo) : await api.crearAlumno(cuerpo);
@@ -157,6 +163,24 @@ export default function AlumnoForm({ alumno, onTerminar }) {
                     <input type="date" value={datos.fechaPago} onChange={cambiar('fechaPago')} className={claseInput(errores.fechaPago)} />
                 </Campo>
             </div>
+
+            {!alumno && (
+                <div className="space-y-2">
+                    <SelectorMedio
+                        valor={medio}
+                        onCambio={(valor) => {
+                            setMedio(valor);
+                            setErrores((err) => ({ ...err, medio: undefined }));
+                        }}
+                        error={errores.medio}
+                    />
+                    {planElegido && (
+                        <p className="text-sm text-slate-500">
+                            Primer pago: <strong className="font-semibold text-slate-900">{formatearPrecio(planElegido.precio)}</strong>. Queda en el historial de pagos.
+                        </p>
+                    )}
+                </div>
+            )}
 
             <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
                 <Boton type="button" variante="secundario" onClick={onTerminar} disabled={guardando}>
