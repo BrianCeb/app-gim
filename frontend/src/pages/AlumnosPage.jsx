@@ -5,7 +5,8 @@ import { useAvisos } from '../context/AvisosContext';
 import { useAuth } from '../hooks/useAuth';
 import { api } from '../lib/api';
 import { puede } from '../lib/permisos';
-import { estadoPago, formatearFecha } from '../lib/fechas';
+import { useFiltroEstado } from '../hooks/useFiltroEstado';
+import { formatearFecha } from '../lib/fechas';
 import { nombreCompleto, normalizarDni, textoBuscable } from '../lib/alumnos';
 import AlumnoForm from '../components/AlumnoForm';
 import RegistrarPago from '../components/RegistrarPago';
@@ -20,31 +21,24 @@ export default function AlumnosPage() {
     const puedeEliminar = puede(usuario, 'eliminarAlumno');
 
     const [busqueda, setBusqueda] = useState('');
-    const [filtro, setFiltro] = useState('todos');
     // formulario: null = cerrado, 'nuevo' = alta, objeto alumno = edición
     const [formulario, setFormulario] = useState(null);
     const [pagando, setPagando] = useState(null);
     const [eliminando, setEliminando] = useState(null);
     const [borrando, setBorrando] = useState(false);
 
-    const conEstado = useMemo(() => alumnos.map((a) => ({ alumno: a, estado: estadoPago(a).clave })), [alumnos]);
+    // Custom hook: el mismo filtro por estado que Pagos (acá el filtro vive solo en memoria)
+    const { filtrados, conteos, filtro, cambiarFiltro } = useFiltroEstado(alumnos);
 
-    const conteos = useMemo(() => {
-        const c = { todos: conEstado.length, alDia: 0, porVencer: 0, vencido: 0 };
-        conEstado.forEach(({ estado }) => c[estado]++);
-        return c;
-    }, [conEstado]);
-
-    // Busca por nombre, apellido o DNI (con o sin puntos)
+    // Sobre lo filtrado por estado, busca por nombre, apellido o DNI (con o sin puntos)
     const visibles = useMemo(() => {
         const texto = textoBuscable(busqueda.trim());
         const dni = normalizarDni(busqueda);
-        return conEstado.filter(({ alumno, estado }) => {
-            if (filtro !== 'todos' && estado !== filtro) return false;
-            if (!texto) return true;
-            return textoBuscable(nombreCompleto(alumno)).includes(texto) || (dni && alumno.dni.includes(dni));
-        });
-    }, [conEstado, busqueda, filtro]);
+        if (!texto) return filtrados;
+        return filtrados.filter(
+            ({ alumno }) => textoBuscable(nombreCompleto(alumno)).includes(texto) || (dni && alumno.dni.includes(dni))
+        );
+    }, [filtrados, busqueda]);
 
     const confirmarEliminar = async () => {
         setBorrando(true);
@@ -96,7 +90,7 @@ export default function AlumnosPage() {
                         className={`${claseInput(false)} pl-9`}
                     />
                 </div>
-                <FiltrosEstado valor={filtro} onCambio={setFiltro} conteos={conteos} />
+                <FiltrosEstado valor={filtro} onCambio={cambiarFiltro} conteos={conteos} />
             </div>
 
             <Tarjeta className="overflow-hidden">
