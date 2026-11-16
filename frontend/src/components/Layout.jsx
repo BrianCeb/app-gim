@@ -136,7 +136,7 @@ export default function Layout() {
                             to={a}
                             end={a === '/'}
                             className={({ isActive }) =>
-                                `flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium ${estaActiva(seccion, isActive) ? 'text-slate-900' : 'text-slate-400'}`
+                                `flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium ${estaActiva(seccion, isActive) ? 'text-slate-900' : 'text-slate-500'}`
                             }
                         >
                             <Icono className="size-5" aria-hidden />

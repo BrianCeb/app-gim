@@ -66,17 +66,17 @@ export default function HistorialPagos({ alumno, onCerrar }) {
                         <li key={pago._id} className={`px-4 py-3 ${pago.vigente ? '' : 'bg-slate-50'}`}>
                             <div className="flex items-baseline justify-between gap-3">
                                 {/* Fecha y monto arriba y grandes: es lo primero que se busca */}
-                                <p className={`font-semibold tabular-nums ${pago.vigente ? 'text-slate-900' : 'text-slate-400 line-through'}`}>
+                                <p className={`font-semibold tabular-nums ${pago.vigente ? 'text-slate-900' : 'text-slate-500 line-through'}`}>
                                     {formatearFecha(pago.fecha)}
                                 </p>
-                                <p className={`text-lg font-bold tabular-nums ${pago.vigente ? 'text-slate-900' : 'text-slate-400 line-through'}`}>
+                                <p className={`text-lg font-bold tabular-nums ${pago.vigente ? 'text-slate-900' : 'text-slate-500 line-through'}`}>
                                     {formatearPrecio(pago.monto)}
                                 </p>
                             </div>
                             <p className="text-sm text-slate-500">
                                 {pago.planNombre} · {etiquetaMedio(pago.medio)} · cubre hasta el {formatearFecha(pago.vencimientoNuevo)}
                             </p>
-                            <p className="text-xs text-slate-400">Registró: {pago.usuarioNombre}</p>
+                            <p className="text-xs text-slate-500">Registró: {pago.usuarioNombre}</p>
 
                             {!pago.vigente && (
                                 <p className="mt-1 text-xs font-semibold text-rose-700">
@@ -116,7 +116,7 @@ export default function HistorialPagos({ alumno, onCerrar }) {
             )}
 
             {puedeAnular && pagos.length > 0 && (
-                <p className="mt-3 text-xs text-slate-400">Solo se puede anular el último pago. El del alta se corrige desde "Editar alumno".</p>
+                <p className="mt-3 text-xs text-slate-500">Solo se puede anular el último pago. El del alta se corrige desde "Editar alumno".</p>
             )}
         </Modal>
     );
