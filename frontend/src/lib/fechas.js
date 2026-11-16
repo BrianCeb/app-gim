@@ -3,7 +3,7 @@
 const ZONA_AR = 'America/Argentina/Buenos_Aires';
 const MS_DIA = 24 * 60 * 60 * 1000;
 
-export const DIAS_CUOTA = 30;
+// Si un alumno no tiene plan (datos viejos sin migrar), se usa el aviso de siempre: 3 días
 export const DIAS_POR_VENCER = 3;
 
 const formatoFecha = new Intl.DateTimeFormat('es-AR', { timeZone: 'UTC', day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -34,6 +34,23 @@ export function sumarDias(iso, dias) {
     return fecha.toISOString().slice(0, 10);
 }
 
+// Mismo cálculo que backend/src/utils/vencimiento.js, para mostrar el vencimiento antes de guardar.
+// Trabaja con textos "YYYY-MM-DD". "meses" = mes calendario (31/1 + 1 mes → 28/2); "dias" = días fijos
+export function sumarDuracion(iso, { cantidad, unidad }) {
+    if (unidad === 'dias') return sumarDias(iso, cantidad);
+    const [anio, mes, dia] = iso.split('-').map(Number);
+    // Date.UTC(año, mes destino + 1, 0) = último día del mes destino
+    const ultimoDia = new Date(Date.UTC(anio, mes - 1 + cantidad + 1, 0)).getUTCDate();
+    return new Date(Date.UTC(anio, mes - 1 + cantidad, Math.min(dia, ultimoDia))).toISOString().slice(0, 10);
+}
+
+// Pago adelantado: se suma al vencimiento actual. Pago el día que vence o después: desde la fecha de pago
+export function calcularVencimiento({ fechaPago, duracion, vencimientoActual = null }) {
+    const actual = vencimientoActual ? fechaAISO(vencimientoActual) : null;
+    const desde = actual && fechaPago < actual ? actual : fechaPago;
+    return sumarDuracion(desde, duracion);
+}
+
 export function diasHasta(fechaVencimiento) {
     const hoy = Date.parse(`${hoyISO()}T00:00:00Z`);
     return Math.round((Date.parse(`${fechaAISO(fechaVencimiento)}T00:00:00Z`) - hoy) / MS_DIA);
@@ -45,10 +62,12 @@ export const ESTADOS = {
     vencido: { etiqueta: 'Vencido', badge: 'bg-rose-50 text-rose-700 ring-rose-600/20', punto: 'bg-rose-500', texto: 'text-rose-700', color: '#f43f5e' }
 };
 
+// Cada plan define con cuántos días de anticipación el alumno aparece "por vencer"
 export function estadoPago(alumno) {
     const dias = diasHasta(alumno.fechaVencimiento);
+    const diasAviso = alumno.plan?.diasAviso ?? DIAS_POR_VENCER;
     if (dias < 0) return { clave: 'vencido', dias };
-    if (dias <= DIAS_POR_VENCER) return { clave: 'porVencer', dias };
+    if (dias <= diasAviso) return { clave: 'porVencer', dias };
     return { clave: 'alDia', dias };
 }
 

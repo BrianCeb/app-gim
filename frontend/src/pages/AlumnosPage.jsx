@@ -118,6 +118,7 @@ export default function AlumnosPage() {
                                 <tr>
                                     <th className="px-5 py-3">Alumno</th>
                                     <th className="px-3 py-3">DNI</th>
+                                    <th className="px-3 py-3">Plan</th>
                                     <th className="px-3 py-3">Último pago</th>
                                     <th className="px-3 py-3">Vencimiento</th>
                                     <th className="px-3 py-3">Estado</th>
@@ -139,6 +140,7 @@ export default function AlumnosPage() {
                                             </div>
                                         </td>
                                         <td className="px-3 py-3 text-slate-600 tabular-nums">{alumno.dni}</td>
+                                        <td className="px-3 py-3 text-slate-600">{alumno.plan?.nombre ?? '—'}</td>
                                         <td className="px-3 py-3 text-slate-600 tabular-nums">{formatearFecha(alumno.fechaPago)}</td>
                                         <td className="px-3 py-3 text-slate-600 tabular-nums">{formatearFecha(alumno.fechaVencimiento)}</td>
                                         <td className="px-3 py-3">
@@ -158,7 +160,10 @@ export default function AlumnosPage() {
                                         <Avatar alumno={alumno} tamaño="size-12" />
                                         <div className="min-w-0 flex-1">
                                             <p className="truncate font-medium text-slate-900">{nombreCompleto(alumno)}</p>
-                                            <p className="text-sm text-slate-500 tabular-nums">DNI {alumno.dni}</p>
+                                            <p className="truncate text-sm text-slate-500 tabular-nums">
+                                                DNI {alumno.dni}
+                                                {alumno.plan && ` · ${alumno.plan.nombre}`}
+                                            </p>
                                         </div>
                                         <EstadoBadge alumno={alumno} />
                                     </div>

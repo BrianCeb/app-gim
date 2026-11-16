@@ -12,6 +12,7 @@ import AlumnosPage from './pages/AlumnosPage';
 import IngresosPage from './pages/IngresosPage';
 import PagosPage from './pages/PagosPage';
 import PersonalPage from './pages/PersonalPage';
+import PlanesPage from './pages/PlanesPage';
 import { Cargando, EstadoVacio } from './components/ui';
 import './index.css';
 
@@ -61,6 +62,15 @@ createRoot(document.getElementById('root')).render(
                                         <Suspense fallback={<Cargando />}>
                                             <EstadisticasPage />
                                         </Suspense>
+                                    </RutaProtegida>
+                                }
+                            />
+                            {/* Ajustes: dos pestañas, cada una con su ruta */}
+                            <Route
+                                path="/planes"
+                                element={
+                                    <RutaProtegida permiso="planes">
+                                        <PlanesPage />
                                     </RutaProtegida>
                                 }
                             />

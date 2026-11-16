@@ -18,5 +18,6 @@ export function validarAlumno(datos) {
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(datos.email.trim())) errores.email = 'Ingresá un email válido.';
     if (!datos.fechaPago) errores.fechaPago = 'Elegí la fecha de pago.';
+    if (!datos.plan) errores.plan = 'Elegí un plan.';
     return errores;
 }
