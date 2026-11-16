@@ -806,8 +806,8 @@ el frontend, y en Chrome:
 | En pantalla: Pagos, Alumnos y Ajustes | Plan y precio en cada fila; columna Plan; pestañas Planes/Personal con "Ajustes" marcado en ambas; sin errores en la consola |
 
 ### Historial de pagos (HU 12)
-Probado en local contra la base real con scripts (el alumno de prueba y sus pagos se borraron al
-terminar):
+Probado en local contra la base real con scripts y en Chrome, con un alumno de prueba (el alumno y
+sus pagos se borraron al terminar):
 
 | Prueba | Resultado |
 |---|---|
@@ -826,6 +826,13 @@ terminar):
 | Historial al final | 2 anulados y el alta vigente: los pagos anulados no se borran |
 | Eliminar el alumno | 200; sus pagos siguen en la colección |
 | `lib/pagos.js` contra `Pago.js` | Las dos listas de medios coinciden |
+| En pantalla: alta sin elegir medio | "Elegí el medio de pago." debajo de los botones, en rojo |
+| En pantalla: alta con Efectivo | Se ve "Primer pago: $ X. Queda en el historial de pagos." y el alumno aparece en Pagos |
+| En pantalla: cobrar sin medio / con Transferencia | Error debajo de los botones / aviso "Pago de $ 0 en transferencia registrado. … al día hasta el 16/01/2027." |
+| En pantalla: Historial | 2 pagos, el más nuevo con "Anular este pago"; el del alta sin el botón |
+| En pantalla: anular | Confirmación dentro del modal con el vencimiento al que vuelve; el pago queda tachado con "Anulado el … por …"; la fila de Pagos vuelve a 16/12/2026 |
+| En pantalla: `/pagos?estado=vencido` | Llega ya filtrado (Vencidos 1); filtros y conteos de Alumnos siguen funcionando |
+| En pantalla, 375 px de ancho | Historial queda solo con ícono para que "Registrar pago" entre en una línea; sin errores en la consola |
 
 Pendiente de probar: volver al **plan anterior** al anular (hace falta un segundo plan activo) y
 anular con una cuenta real de recepción.
