@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import Alumno from '../dao/models/Alumno.js';
 import Foto from '../dao/models/Foto.js';
 import Plan from '../dao/models/Plan.js';
+import Pago, { MEDIOS_PAGO } from '../dao/models/Pago.js';
 import { calcularVencimiento, sumarDuracion } from '../utils/vencimiento.js';
 import { requireRol } from '../middlewares/auth.js';
 
@@ -88,6 +89,32 @@ function validarAlumno(body) {
     return { datos: { nombre, apellido, dni, email, fechaPago } };
 }
 
+// El medio de pago es obligatorio al cobrar (alta y renovación) y tiene que ser uno de la lista fija
+function validarMedio(medio) {
+    return MEDIOS_PAGO.includes(medio) ? null : 'Elegí el medio de pago (efectivo, transferencia, débito o crédito).';
+}
+
+// Arma el registro del historial (HU 12). El monto es el precio del plan en ese momento: si el precio
+// cambia después, lo cobrado no cambia. "anterior" es cómo estaba el alumno antes de este pago
+// (en el alta no hay nada anterior) y sirve para poder anularlo.
+function armarPago({ alumno, plan, fecha, medio, usuario, anterior = {} }) {
+    return {
+        alumno: alumno._id,
+        alumnoNombre: `${alumno.nombre} ${alumno.apellido}`,
+        alumnoDni: alumno.dni,
+        fecha,
+        plan: plan._id,
+        planNombre: plan.nombre,
+        monto: plan.precio,
+        medio,
+        usuario: usuario._id,
+        usuarioNombre: usuario.nombre,
+        fechaPagoAnterior: anterior.fechaPago ?? null,
+        vencimientoAnterior: anterior.fechaVencimiento ?? null,
+        vencimientoNuevo: alumno.fechaVencimiento
+    };
+}
+
 function responderError(res, error, mensaje) {
     // 11000 = índice único de Mongo: otro alumno ya tiene ese DNI
     if (error.code === 11000) {
@@ -121,11 +148,25 @@ router.post('/', async (req, res) => {
         const { plan, error: errorPlan } = await buscarPlan(req.body.plan);
         if (errorPlan) return res.status(400).json({ error: errorPlan });
 
+        // El alta también es el primer pago: se pide el medio igual que al cobrar
+        const errorMedio = validarMedio(req.body.medio);
+        if (errorMedio) return res.status(400).json({ error: errorMedio });
+
         // Alta: no hay vencimiento anterior, el período cuenta desde la fecha de pago
-        const nuevoAlumno = await Alumno.create({
+        const nuevoAlumno = new Alumno({
             ...datos,
             plan: plan._id,
             fechaVencimiento: calcularVencimiento({ fechaPago: datos.fechaPago, duracion: plan.duracion })
+        });
+
+        // Transacción: el alumno y su primer pago se guardan juntos o no se guarda ninguno
+        // (si fallara el pago, no queda un alumno "pagado" sin registro en el historial)
+        await mongoose.connection.transaction(async (session) => {
+            await nuevoAlumno.save({ session });
+            await Pago.create(
+                [armarPago({ alumno: nuevoAlumno, plan, fecha: datos.fechaPago, medio: req.body.medio, usuario: req.usuario })],
+                { session }
+            );
         });
         await nuevoAlumno.populate('plan', CAMPOS_PLAN);
         avisarCambio(req);
@@ -170,6 +211,7 @@ router.delete('/:id', requireRol('administracion'), async (req, res) => {
         if (!alumnoEliminado)
             return res.status(404).json({ error: 'Alumno no encontrado' });
         await Foto.deleteOne({ alumno: alumnoEliminado._id });
+        // Sus pagos NO se borran: guardan nombre y DNI, y cuentan para la recaudación (HU 13)
         avisarCambio(req);
         res.json({ mensaje: 'Alumno eliminado correctamente' });
     } catch (error) {
@@ -221,6 +263,7 @@ router.put('/:id', async (req, res) => {
    - Se puede elegir otro plan al pagar (body.plan): este pago ya usa el plan nuevo.
    - Pago adelantado: el período se suma al vencimiento actual. Pago tarde: cuenta desde el día del pago.
    - Al pagar, el plan tiene que estar activo (un plan desactivado ya no se cobra).
+   - HU 12: pide el medio de pago y guarda el pago en el historial con el precio del plan como monto.
 ================================= */
 router.post('/:id/pago', async (req, res) => {
     try {
@@ -229,11 +272,17 @@ router.post('/:id/pago', async (req, res) => {
             return res.status(400).json({ error: 'La fecha de pago no es válida.' });
         }
 
+        const errorMedio = validarMedio(req.body?.medio);
+        if (errorMedio) return res.status(400).json({ error: errorMedio });
+
         const alumno = await Alumno.findById(req.params.id);
         if (!alumno) return res.status(404).json({ error: 'Alumno no encontrado' });
 
         const { plan, error: errorPlan } = await buscarPlan(req.body?.plan ?? alumno.plan);
         if (errorPlan) return res.status(400).json({ error: errorPlan });
+
+        // Se anota cómo estaba antes de pagar, para poder anular este pago si fue un error
+        const anterior = { fechaPago: alumno.fechaPago, fechaVencimiento: alumno.fechaVencimiento };
 
         alumno.fechaVencimiento = calcularVencimiento({
             fechaPago,
@@ -242,13 +291,40 @@ router.post('/:id/pago', async (req, res) => {
         });
         alumno.fechaPago = fechaPago;
         alumno.plan = plan._id;
-        await alumno.save();
+
+        // Transacción: el alumno renovado y el registro del pago se guardan juntos
+        let pago;
+        await mongoose.connection.transaction(async (session) => {
+            await alumno.save({ session });
+            [pago] = await Pago.create(
+                [armarPago({ alumno, plan, fecha: fechaPago, medio: req.body.medio, usuario: req.usuario, anterior })],
+                { session }
+            );
+        });
         await alumno.populate('plan', CAMPOS_PLAN);
 
         avisarCambio(req);
-        res.json(alumno);
+        // Se devuelve el alumno como antes (para no romper a quien ya lo usa) y el pago creado
+        res.json({ ...alumno.toJSON(), pago });
     } catch (error) {
         responderError(res, error, 'Error al registrar el pago');
+    }
+});
+
+/* ===============================
+   📜 HISTORIAL DE PAGOS DEL ALUMNO (HU 12)
+   Del más reciente al más viejo, incluidos los anulados (se muestran tachados).
+   Se ordena por fecha de registro: el último registrado es el único que se puede anular.
+================================= */
+router.get('/:id/pagos', async (req, res) => {
+    try {
+        const alumno = await Alumno.exists({ _id: req.params.id });
+        if (!alumno) return res.status(404).json({ error: 'Alumno no encontrado' });
+
+        const pagos = await Pago.find({ alumno: req.params.id }).sort({ createdAt: -1 });
+        res.json(pagos);
+    } catch (error) {
+        responderError(res, error, 'Error al obtener el historial de pagos');
     }
 });
 
