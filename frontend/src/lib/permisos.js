@@ -18,7 +18,9 @@ const PERMISOS = {
     eliminarAlumno: [ROLES.ADMINISTRACION],
     personal: [ROLES.ADMINISTRACION],
     // Crear y editar planes de cuota (verlos y elegirlos lo hacen todos)
-    planes: [ROLES.ADMINISTRACION]
+    planes: [ROLES.ADMINISTRACION],
+    // Anular un pago (HU 12): ver el historial lo hacen todos
+    anularPago: [ROLES.ADMINISTRACION]
 };
 
 // puede(usuario, 'estadisticas') → true / false. Sin permiso indicado: alcanza con haber iniciado sesión
