@@ -22,6 +22,7 @@ import alumnosRouter from './src/routes/alumnos.router.js';
 import ingresosRouter from './src/routes/ingresos.router.js';
 import usuariosRouter from './src/routes/usuarios.router.js';
 import planesRouter from './src/routes/planes.router.js';
+import pagosRouter from './src/routes/pagos.router.js';
 
 // 🔧 configuración base
 dotenv.config();
@@ -66,6 +67,8 @@ app.use('/api/alumnos', requireAuth, alumnosRouter);
 app.use('/api/ingresos', requireAuth, ingresosRouter);
 // Planes: verlos, cualquiera con sesión; crear y editar, solo administración (se controla en el router)
 app.use('/api/planes', requireAuth, planesRouter);
+// Pagos: anular es solo para administración (se controla en el router). El historial está en /api/alumnos/:id/pagos
+app.use('/api/pagos', requireAuth, pagosRouter);
 // Cuentas del personal: todo el router es solo para administración
 app.use('/api/usuarios', requireAuth, requireRol('administracion'), usuariosRouter);
 
