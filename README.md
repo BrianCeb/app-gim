@@ -56,7 +56,8 @@ La app abre en el **Inicio** (`/ingresar`): ingresá con el email y la contrase�
 - Cambiar el plan al editar se aplica desde el próximo pago; al registrar el pago se puede elegir otro plan.
 - Los planes no se borran: se desactivan. Con un plan desactivado no se puede dar de alta ni cobrar.
 - Estado: **Vencido** si el vencimiento ya pasó; **Por vencer** si faltan tantos días o menos como el aviso del plan (3 en el Mensual); si no, **Al día**.
-- "Registrar pago" usa la fecha de hoy y el plan del alumno (se pueden cambiar) y recalcula el vencimiento.
+- "Registrar pago" usa la fecha de hoy y el plan del alumno (se pueden cambiar), pide el medio de pago y recalcula el vencimiento.
+- Cada pago queda en el historial con monto (precio del plan), medio y quién lo registró. Administración puede anular el último pago de un alumno: el vencimiento vuelve al anterior y el pago queda tachado, no se borra.
 - Las fechas se guardan a medianoche UTC y se muestran en formato argentino (dd/mm/aaaa).
 - Las fotos se achican en el navegador (máx. 400 px) y se guardan en MongoDB, en la colección `fotos`.
 - Cada ingreso guarda el `_id` del alumno (y el DNI de ese día): corregir el DNI de un alumno no le hace perder sus ingresos.
@@ -67,6 +68,8 @@ La app abre en el **Inicio** (`/ingresar`): ingresá con el email y la contrase�
 |---|---|---|
 | Panel, Ingresos, Pagos | ✔ | ✔ |
 | Ver, crear y editar alumnos; registrar pagos y fotos | ✔ | ✔ |
+| Ver el historial de pagos | ✔ | ✔ |
+| Anular el último pago de un alumno | — | ✔ |
 | Elegir el plan de un alumno y ver los precios | ✔ | ✔ |
 | Ajustes → Planes: crear, editar, activar/desactivar planes | — | ✔ |
 | Eliminar alumnos | — | ✔ |
@@ -86,11 +89,13 @@ Todas las rutas `/api` piden sesión, salvo login y logout. Sin sesión → **40
 | POST | `/api/auth/logout` | Cerrar sesión (borra la cookie) |
 | GET | `/api/auth/yo` | Usuario de la sesión actual |
 | GET | `/api/alumnos` | Lista de alumnos (orden: apellido, nombre) |
-| POST | `/api/alumnos` | Crear alumno (`nombre, apellido, dni, email, fechaPago, plan`) |
+| POST | `/api/alumnos` | Crear alumno (`nombre, apellido, dni, email, fechaPago, plan, medio`); registra el primer pago |
 | GET | `/api/alumnos/dni/:dni` | Buscar por DNI |
 | PUT | `/api/alumnos/:id` | Editar alumno (`plan` opcional; el vencimiento cambia solo si cambia la fecha de pago) |
 | DELETE | `/api/alumnos/:id` | Eliminar alumno (y su foto) — **solo administración** |
-| POST | `/api/alumnos/:id/pago` | Registrar pago (`fechaPago` y `plan` opcionales: por defecto hoy y su plan) |
+| POST | `/api/alumnos/:id/pago` | Registrar pago (`medio` obligatorio; `fechaPago` y `plan` opcionales: por defecto hoy y su plan) |
+| GET | `/api/alumnos/:id/pagos` | Historial de pagos del alumno (incluye los anulados) |
+| POST | `/api/pagos/:id/anular` | Anular el último pago del alumno (solo administración) |
 | GET / PUT / DELETE | `/api/alumnos/:id/foto` | Ver / subir (`imagen` en base64) / quitar foto |
 | GET | `/api/ingresos` | Lista de ingresos (más recientes primero) |
 | POST | `/api/ingresos` | Registrar ingreso (`dni`); devuelve también el alumno |
