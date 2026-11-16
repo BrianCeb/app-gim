@@ -3,6 +3,7 @@ import { MEDIOS_PAGO } from '../lib/pagos';
 
 // Botones grandes para elegir el medio de pago (se usa al cobrar y en el alta).
 // Botones en vez de un <select>: son 4 opciones, se ven todas juntas y se eligen con un toque.
+// En 2 columnas: botones anchos, fáciles de tocar (ley de Fitts) y "Transferencia" entra completa.
 // Se comportan como un grupo de radio: role="radiogroup" y aria-checked para lectores de pantalla.
 export default function SelectorMedio({ valor, onCambio, error }) {
     const idEtiqueta = useId();
@@ -11,7 +12,7 @@ export default function SelectorMedio({ valor, onCambio, error }) {
             <span id={idEtiqueta} className="mb-1.5 block text-sm font-medium text-slate-700">
                 Medio de pago
             </span>
-            <div role="radiogroup" aria-labelledby={idEtiqueta} className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div role="radiogroup" aria-labelledby={idEtiqueta} className="grid grid-cols-2 gap-2">
                 {MEDIOS_PAGO.map((m) => {
                     const elegido = valor === m.valor;
                     return (

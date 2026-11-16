@@ -56,8 +56,17 @@ export default function PagosPage() {
                                 <div className="flex w-full items-center justify-between gap-3 sm:w-auto">
                                     <EstadoBadge alumno={alumno} />
                                     <div className="flex gap-2">
-                                        <Boton variante="secundario" className="py-2" onClick={() => setViendoHistorial(alumno)}>
-                                            <History className="size-4" aria-hidden /> Historial
+                                        {/* En celular solo el ícono (el texto no entra al lado de "Registrar pago");
+                                            aria-label y title dicen "Historial" igual */}
+                                        <Boton
+                                            variante="secundario"
+                                            className="px-3 py-2 sm:px-4"
+                                            onClick={() => setViendoHistorial(alumno)}
+                                            aria-label="Historial de pagos"
+                                            title="Historial de pagos"
+                                        >
+                                            <History className="size-4" aria-hidden />
+                                            <span className="hidden sm:inline">Historial</span>
                                         </Boton>
                                         <Boton variante={dias < 0 ? 'primario' : 'secundario'} className="py-2" onClick={() => setPagando(alumno)}>
                                             Registrar pago
