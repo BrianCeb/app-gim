@@ -120,6 +120,8 @@ Los errores siempre vuelven como JSON: `{ "error": "mensaje para mostrar" }`.
    - **Health Check Path:** `/healthz`
    - **Environment:** `MONGO_URI` = tu URI de Atlas (secreto), `JWT_SECRET` = una clave larga y distinta de la de desarrollo (secreto), `NODE_ENV` = `production` (activa la cookie `Secure`) y `NODE_VERSION` = `22`
    - **Plan:** uno pago (Starter) para que el servicio no se "duerma". El gratuito se apaga tras 15 min sin uso y tarda en despertar.
+> **Por qué el build usa `--include=dev`:** con `NODE_ENV=production`, `npm ci` saltea las devDependencies, y `vite` es una devDependency del frontend. Sin ese flag el build falla con `vite: not found` (exit 127). La variable se deja igual porque en ejecución activa la cookie `Secure`.
+
 4. Primer administrador: en Render → **Shell**, con `ADMIN_NOMBRE`, `ADMIN_EMAIL` y `ADMIN_PASSWORD` cargadas como variables, corré `npm run seed:admin --prefix backend`. Después podés borrar esas tres variables. Si la base de producción es otra y tiene ingresos viejos, corré también `npm run migrar:ingresos --prefix backend -- --aplicar` y `npm run migrar:planes --prefix backend -- --aplicar`.
 5. En MongoDB Atlas → **Network Access**: permití las IP de salida de Render (aparecen en el panel del servicio, en *Connect → Outbound*) o, si no, `0.0.0.0/0` con un usuario de base con contraseña fuerte.
 
