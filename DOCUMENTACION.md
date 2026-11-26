@@ -62,11 +62,12 @@ La aplicación tiene una pantalla pública de **Inicio** y seis secciones que re
 |---|---|
 | **Inicio** (`/ingresar`) | Propuesta de valor de la aplicación y formulario de ingreso (email y contraseña). Es la única pantalla que se ve sin sesión. |
 | **Panel** | Registrar una asistencia por DNI o por nombre; ver asistencias del día, cantidad de alumnos al día, por vencer y vencidos, y cuántas fichas de salud hay que revisar; lista de "cuotas a revisar" con botón "Pagó". |
-| **Asistencia** (`/ingresos`) | Registrar la entrada buscando por DNI o por nombre y ver el listado de asistencias de cualquier día (hora, alumno, estado de su cuota). En los datos sigue llamándose *ingreso*: cambió el lenguaje de la interfaz, no el modelo. |
+| **Asistencia** (`/ingresos`) | Registrar la entrada de dos formas: buscando por DNI o por nombre, o marcando con un clic al alumno en la lista de la clase que está pasando. Además, el listado de asistencias de cualquier día (hora, alumno, estado de su cuota). En los datos sigue llamándose *ingreso*: cambió el lenguaje de la interfaz, no el modelo. |
 | **Alumnos** | Listado completo con el plan de cada alumno; búsqueda por nombre, apellido o DNI (sin importar tildes ni puntos); filtro por estado; alta (con plan y medio del primer pago obligatorios), edición, eliminación con confirmación, registro de pago, foto y ficha de salud; aviso y filtro de a quién le falta el apto físico o lo tiene vencido. |
 | **Pagos** | Alumnos ordenados por vencimiento (los más urgentes primero), con su plan y precio vigente; filtro por estado; botón para registrar el pago con su medio (se puede cambiar de plan al pagar) y botón **Historial** con todos los pagos del alumno (HU 12). |
 | **Estadísticas** | Gráfico de barras de asistencias por día (últimos 30 días), promedio diario, total de alumnos y gráfico de torta con el estado de las cuotas. |
-| **Ajustes → Planes** (`/planes`) | Planes de cuota: alta (nombre, duración, precio y días de aviso), edición, activar o desactivar. Muestra cuántos alumnos tiene cada plan. Solo administración. |
+| **Ajustes → Planes** (`/planes`) | Planes de cuota: alta (nombre, duración, precio, días de aviso y clases por semana), edición, activar o desactivar. Muestra cuántos alumnos tiene cada plan. Solo administración. |
+| **Ajustes → Clases** (`/clases`) | Clases o turnos: alta (nombre, días y horario), edición, activar o desactivar. Muestra cuántos alumnos tiene cada una. Solo administración. |
 | **Ajustes → Personal** (`/personal`) | Cuentas para ingresar a la app: alta (nombre, email, rol y contraseña), edición, activar o desactivar con confirmación y cambio de contraseña. Solo administración. |
 
 ### Roles del personal
@@ -113,6 +114,21 @@ Además:
   alcanza con Enter) o por nombre, eligiendo de la lista de coincidencias. Se registra aunque la cuota
   esté vencida, pero la pantalla lo avisa claramente en rojo.
 - Las fechas se muestran en formato argentino (dd/mm/aaaa).
+
+### Clases (turnos) y clases por semana
+Confirmadas por Brian (25/11/2026):
+- Una **clase** es un turno fijo: nombre, días de la semana y horario (por ejemplo "Turno mañana",
+  lunes, miércoles y viernes de 08:00 a 10:00). Sirve para los alumnos que vienen siempre al mismo horario.
+- **Un alumno, una clase.** Es opcional: quien no tiene turno fijo se registra por DNI o por nombre.
+- Las clases **no se borran**: se desactivan. Los alumnos anotados la conservan hasta que se los pase
+  a otra, así no se pierde a qué turno iban.
+- En Asistencia se muestra la clase que está pasando (según el día y la hora de Argentina; si ninguna
+  está en curso, la próxima del día, y si ya terminaron todas, la última) y se marca a cada alumno con
+  **un clic**. Quien ya tiene su asistencia de hoy aparece tildado y no se puede marcar dos veces.
+- Cada **plan** puede cubrir una cantidad de **clases por semana** (1, 2, 3…) o ser libre. Si el alumno
+  ya vino esa cantidad de veces desde el lunes, al registrarlo aparece un aviso en ámbar. **No bloquea
+  la entrada**: en el mostrador la decisión es de la persona que atiende, no del sistema.
+- La semana se cuenta de **lunes a domingo**, en hora de Argentina.
 
 ### Ficha de salud — apto físico
 Confirmada por Brian (25/11/2026):
@@ -359,6 +375,7 @@ gimnasio-app/
 | `fechaVencimiento` | Date | Calculada según el plan (ver reglas de la HU 11). |
 | `plan` | ObjectId | Referencia al plan de cuota (con índice). Obligatorio al dar de alta (lo controla la ruta; en el esquema no es `required` para no romper datos sin migrar). |
 | `fotoUrl` | String | Ruta a la foto (`/api/alumnos/:id/foto?v=...`) o vacío. |
+| `clase` | ObjectId | Clase (turno) a la que viene, o `null` si no tiene turno fijo. Con índice. |
 | `fichaSalud.url` | String | Ruta a la ficha de salud (`/api/alumnos/:id/ficha?v=...`) o vacío si no la entregó. |
 | `fichaSalud.fecha` | Date | Fecha del apto físico que figura en el certificado, o `null`. |
 | `fichaSalud.vence` | Date | Un año después de `fecha`, o `null`. Copia en el alumno para que el listado avise sin bajar archivos. |
@@ -390,6 +407,14 @@ con el DNI guardado.
 
 Los ingresos anteriores a este cambio se vinculan una vez con `npm run migrar:ingresos` (ver
 sección 13).
+
+### Colección `clases` (modelo `Clase`)
+| Campo | Tipo | Detalle |
+|---|---|---|
+| `nombre` | String | Obligatorio y **único** (no distingue mayúsculas al validar). |
+| `dias` | [Number] | Días de la semana con los números de JavaScript (0 = domingo … 6 = sábado). Al menos uno, sin repetir, y se guardan ordenados de lunes a domingo. |
+| `horaInicio` / `horaFin` | String | "HH:MM" en 24 horas; el fin tiene que ser posterior al inicio. |
+| `activa` | Boolean | Las clases no se borran: se desactivan. |
 
 ### Colección `fichasaluds` (modelo `FichaSalud`)
 | Campo | Tipo | Detalle |
@@ -503,8 +528,12 @@ permiso, **403**.
 | DELETE | `/api/alumnos/:id/foto` | sesión | Quitar la foto | 200, 404 |
 | GET | `/api/ingresos` | sesión | Lista de ingresos, más recientes primero | 200 |
 | POST | `/api/ingresos` | sesión | Registrar la asistencia por `dni`; devuelve también el alumno. Buscar por nombre es del lado del cliente: se elige un alumno y se envía su DNI | 201, 400, 404 |
+| GET | `/api/clases` | sesión | Clases (activas primero, por hora y nombre), incluidas las desactivadas | 200 |
+| POST | `/api/clases` | **admin** | Crear clase (`nombre`, `dias`, `horaInicio`, `horaFin`) | 201, 400, 403, 409 (nombre repetido) |
+| PUT | `/api/clases/:id` | **admin** | Editar clase (mismos campos + `activa`, booleano obligatorio). No hay DELETE: se desactiva | 200, 400, 403, 404, 409 |
+| GET | `/api/clases/:id/alumnos` | sesión | Alumnos anotados en esa clase, por apellido y nombre | 200, 400, 404 |
 | GET | `/api/planes` | sesión | Planes (activos primero, por nombre), incluidos los desactivados | 200 |
-| POST | `/api/planes` | **admin** | Crear plan (`nombre`, `duracion: { cantidad, unidad }`, `precio`, `diasAviso` opcional) | 201, 400, 403, 409 (nombre repetido) |
+| POST | `/api/planes` | **admin** | Crear plan (`nombre`, `duracion: { cantidad, unidad }`, `precio`, `diasAviso` y `clasesPorSemana` opcionales) | 201, 400, 403, 409 (nombre repetido) |
 | PUT | `/api/planes/:id` | **admin** | Editar plan (mismos campos + `activo`, booleano obligatorio). No hay DELETE: se desactiva | 200, 400, 403, 404, 409 |
 | GET | `/api/usuarios` | **admin** | Cuentas del personal (activas primero, por nombre), sin el hash | 200, 403 |
 | POST | `/api/usuarios` | **admin** | Crear cuenta (`nombre`, `email`, `rol`, `password`) | 201, 400, 403, 409 (email repetido) |
@@ -609,10 +638,23 @@ Respuesta `201 Created`: el alumno guardado con `_id`, `dni: "12345678"`,
   "Ficha vencida", "Ficha al día"), enlace para abrir el archivo, botón para adjuntar o reemplazar y la
   fecha del apto, que solo se pide cuando hay archivo nuevo. El alumno se guarda primero y los archivos
   después: si falla la foto o la ficha, se avisa cuál falló pero el alumno no se pierde.
+- **Lista de la clase (`ListaClase`):** debajo del buscador, en Asistencia, aparece la clase que está
+  pasando con sus alumnos: se registra la asistencia tocando el nombre. Quien ya vino hoy queda tildado,
+  en verde y sin poder tocarse de nuevo, y el encabezado dice cuántos van ("4 de 5 marcados"). Si hoy
+  hay más de un turno, se cambia con un selector. Los alumnos se filtran en el navegador con la lista
+  que ya tiene `DatosContext`: no hace falta pedir nada más al servidor.
+- **Por qué va en Asistencia y no en el Panel:** el Panel es una de las tres pantallas del prototipo de
+  la materia y ya tiene sus tres grupos justificados. La lista por clic es una segunda vía para la misma
+  tarea, así que vive en la pantalla de Asistencia, al lado del buscador.
 - **Ficha en el listado y en el Panel:** la pastilla de ficha solo aparece cuando hay algo para resolver,
   para no competir con el estado de la cuota. El Panel suma un quinto indicador, "Ficha a revisar", que
   lleva a `/alumnos?ficha=pendiente`; en celular ocupa las dos columnas y pone el número al lado del
   texto, para no empujar de más lo que sigue.
+- **Días de la clase con botones (`ClaseForm`):** los siete días son botones que se encienden y se
+  apagan (`aria-pressed`), en vez de un desplegable múltiple: se ven todos a la vez y se eligen con un toque.
+- **Aviso de clases por semana:** al registrar la asistencia se cuentan las del alumno desde el lunes;
+  si pasa lo que cubre su plan, aparece "Va 4 clases esta semana y el plan cubre 1" en ámbar, junto al
+  estado de la cuota. Es un aviso, no un bloqueo.
 - **Medio de pago con botones (`SelectorMedio`):** 4 botones grandes en vez de una lista desplegable:
   se ven todas las opciones y se eligen con un toque (más rápido en el mostrador y en el celular).
   Funcionan como un grupo de radio (`role="radiogroup"`, `aria-checked`) para lectores de pantalla.
@@ -944,8 +986,25 @@ Probado contra la base real con un script que inicia sesión como administració
 | `POST /api/ingresos` por DNI | ✅ 201 con el alumno y la hora |
 | `npm run seed:demo -- --aplicar` | ✅ 20 alumnos, 60 pagos, 17 fichas y 829 asistencias; estados 12 al día / 4 por vencer / 4 vencidos y fichas 13 al día / 2 por vencer / 2 vencidas / 3 sin ficha |
 
-Pendiente de probar en pantalla (necesita una sesión abierta en el navegador): buscar por nombre en
-el Panel, adjuntar una ficha desde el formulario y el filtro "Ficha a revisar".
+Probado en pantalla el 25/11/2026 con una cuenta de administración: buscar por nombre y registrar desde
+la lista de coincidencias, el filtro "Ficha a revisar" del Panel y las marcas "Sin ficha" y "Ficha vencida"
+en el listado de alumnos. Queda pendiente adjuntar una ficha desde el formulario en pantalla (la API sí
+se probó).
+
+### Clases y planes por clases por semana (25/11/2026)
+
+| Qué se probó | Resultado |
+|---|---|
+| Crear "Mensual 3 clases" desde Ajustes → Planes | ✅ queda "1 mes · 3 clases por semana · $ 38.000" |
+| `POST /api/planes` con los otros dos planes | ✅ 201 |
+| `POST /api/clases` (Turno mañana y Turno tarde) | ✅ 201 |
+| Clase sin días, con un día inválido, con hora mal escrita o con el fin antes del inicio | ✅ 400 con el mensaje de cada caso |
+| Clase con un nombre repetido ("turno MAÑANA") | ✅ 409 |
+| `PUT /api/alumnos/:id` con `clase` | ✅ 200 en 11 alumnos; el vencimiento no cambió |
+| `PUT` con una clase inexistente | ✅ 400 "La clase elegida no existe." |
+| `GET /api/clases/:id/alumnos` | ✅ los 6 alumnos del turno mañana |
+| Marcar la asistencia con un clic en la lista de la clase | ✅ el alumno queda tildado, el contador pasa a "4 de 5" y aparece en las asistencias del día |
+| Alumno con plan de 1 clase que ya vino 4 veces | ✅ aviso en ámbar "Va 4 clases esta semana y el plan cubre 1" (no bloquea) |
 
 ## 16. Evolución del proyecto y problemas resueltos
 

@@ -35,6 +35,8 @@ No cambiar de framework, librería o versión sin justificarlo y sin aprobación
 - Estados: vencido (fecha pasada), por vencer (faltan los "días de aviso" del plan o menos; 3 en el Mensual), al día (más).
 - DNI único, se guarda solo con números, entre 6 y 9 dígitos.
 - Fechas de pago guardadas a medianoche UTC; se muestran en formato `es-AR`. Ingresos en hora de Argentina.
+- Ficha de salud (apto físico): opcional al dar de alta, PDF o foto, vale un año desde la fecha del certificado.
+- Clases (turnos): un alumno, una clase, y es opcional. El plan puede cubrir N clases por semana; pasarse solo avisa, nunca bloquea la entrada.
 - No inventar reglas de negocio (prórrogas, pagos parciales, bloqueos): preguntar a Brian.
 
 ## Seguridad (obligatorio)
