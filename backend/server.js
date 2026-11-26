@@ -57,6 +57,14 @@ io.on('connection', () => {
 });
 
 // 🧱 middlewares (límite de 1mb para permitir fotos en base64)
+//
+// Excepción: la ficha de salud puede ser un PDF escaneado, y en base64 ocupa un 33 % más.
+// Su ruta se parsea antes con un límite de 6 mb; express.json no vuelve a leer un cuerpo ya
+// parseado, así que el límite general de abajo no la alcanza.
+const jsonFicha = express.json({ limit: '6mb' });
+app.use((req, res, next) =>
+    /^\/api\/alumnos\/[^/]+\/ficha$/.test(req.path) ? jsonFicha(req, res, next) : next()
+);
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser()); // deja las cookies en req.cookies (ahí viaja el token de sesión)
 

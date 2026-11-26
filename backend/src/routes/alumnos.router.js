@@ -2,6 +2,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import Alumno from '../dao/models/Alumno.js';
 import Foto from '../dao/models/Foto.js';
+import FichaSalud from '../dao/models/FichaSalud.js';
 import Plan from '../dao/models/Plan.js';
 import Pago, { MEDIOS_PAGO } from '../dao/models/Pago.js';
 import { calcularVencimiento, sumarDuracion } from '../utils/vencimiento.js';
@@ -12,6 +13,13 @@ const router = express.Router();
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const FOTO_REGEX = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/;
 const FOTO_MAX_BYTES = 600 * 1024;
+
+// Ficha de salud (apto físico): el certificado escaneado en PDF o una foto del papel.
+// 4 MB alcanza para un PDF de una o dos páginas; server.js le da a esta ruta un cuerpo de 6 MB
+// porque base64 agranda el archivo un 33 %.
+const FICHA_REGEX = /^data:(application\/pdf|image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/;
+const FICHA_MAX_BYTES = 4 * 1024 * 1024;
+const EXTENSION_FICHA = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
 
 /* ===============================
    🧰 AYUDANTES
@@ -61,6 +69,23 @@ function avisarCambio(req) {
 // Acepta "12.345.678" o "12 345 678" y lo guarda como "12345678"
 function normalizarDni(valor) {
     return String(valor ?? '').replace(/[.\s]/g, '');
+}
+
+// El apto físico vale un año desde la fecha del certificado.
+// Caso borde: un apto del 29/2 vence el 1/3 del año siguiente (ese día no existe).
+function vencimientoFicha(fecha) {
+    return new Date(Date.UTC(fecha.getUTCFullYear() + 1, fecha.getUTCMonth(), fecha.getUTCDate()));
+}
+
+// Deja solo el nombre del archivo (sin carpetas) y sin comillas ni saltos de línea, porque viaja
+// en la cabecera Content-Disposition al descargarlo
+function limpiarNombreArchivo(valor) {
+    return String(valor ?? '')
+        .split(/[\\/]/)
+        .pop()
+        .replace(/["\r\n]/g, '')
+        .trim()
+        .slice(0, 100);
 }
 
 // Valida el body y devuelve { datos } listos para guardar, o { error } con un mensaje para el usuario
@@ -212,6 +237,7 @@ router.delete('/:id', requireRol('administracion'), async (req, res) => {
         if (!alumnoEliminado)
             return res.status(404).json({ error: 'Alumno no encontrado' });
         await Foto.deleteOne({ alumno: alumnoEliminado._id });
+        await FichaSalud.deleteOne({ alumno: alumnoEliminado._id });
         // Sus pagos NO se borran: guardan nombre y DNI, y cuentan para la recaudación (HU 13)
         avisarCambio(req);
         res.json({ mensaje: 'Alumno eliminado correctamente' });
@@ -388,6 +414,87 @@ router.delete('/:id/foto', async (req, res) => {
         res.json(alumno);
     } catch (error) {
         responderError(res, error, 'Error al eliminar la foto');
+    }
+});
+
+/* ===============================
+   🩺 FICHA DE SALUD (APTO FÍSICO)
+   - Es opcional: el alumno se puede dar de alta sin ella y queda marcado como "Sin ficha".
+   - El archivo es un PDF o una foto del certificado; vale un año desde la fecha del apto.
+   - Hay una sola ficha por alumno: cargar una nueva reemplaza la anterior (es la renovación).
+================================= */
+router.get('/:id/ficha', async (req, res) => {
+    try {
+        const ficha = await FichaSalud.findOne({ alumno: req.params.id });
+        if (!ficha) return res.status(404).json({ error: 'El alumno no tiene ficha de salud' });
+
+        const nombre = ficha.nombreArchivo || `apto-fisico.${EXTENSION_FICHA[ficha.contentType]}`;
+        // inline: el PDF o la imagen se abren en otra pestaña en vez de descargarse directamente.
+        // La URL lleva ?v=..., que cambia con cada ficha nueva, así que se puede cachear mucho tiempo;
+        // private: solo la guarda el navegador de quien inició sesión, nunca un caché compartido
+        res.set('Content-Disposition', `inline; filename="${nombre}"`);
+        res.set('Cache-Control', 'private, max-age=31536000, immutable');
+        res.type(ficha.contentType).send(ficha.data);
+    } catch (error) {
+        responderError(res, error, 'Error al obtener la ficha de salud');
+    }
+});
+
+router.put('/:id/ficha', async (req, res) => {
+    try {
+        const coincide = FICHA_REGEX.exec(String(req.body?.archivo ?? ''));
+        if (!coincide) {
+            return res.status(400).json({ error: 'La ficha de salud debe ser un PDF o una imagen JPG, PNG o WEBP.' });
+        }
+
+        const data = Buffer.from(coincide[2], 'base64');
+        if (data.length > FICHA_MAX_BYTES) {
+            return res.status(413).json({ error: 'La ficha de salud no puede pesar más de 4 MB.' });
+        }
+
+        // Fecha del certificado: de ella depende el vencimiento, así que es obligatoria.
+        // No puede ser futura (un apto no se firma antes de revisar al alumno)
+        const fecha = parsearFecha(req.body?.fecha);
+        if (!fecha) {
+            return res.status(400).json({ error: 'Indicá la fecha del apto físico.' });
+        }
+        if (fecha.getTime() > hoyEnArgentina().getTime()) {
+            return res.status(400).json({ error: 'La fecha del apto físico no puede ser futura.' });
+        }
+
+        const alumno = await Alumno.findById(req.params.id);
+        if (!alumno) return res.status(404).json({ error: 'Alumno no encontrado' });
+
+        const vence = vencimientoFicha(fecha);
+        await FichaSalud.findOneAndUpdate(
+            { alumno: alumno._id },
+            { data, contentType: coincide[1], nombreArchivo: limpiarNombreArchivo(req.body?.nombreArchivo), fecha, vence },
+            { upsert: true }
+        );
+        // Resumen en el alumno: con esto el listado sabe quién tiene ficha y hasta cuándo vale
+        alumno.fichaSalud = { url: `/api/alumnos/${alumno._id}/ficha?v=${Date.now()}`, fecha, vence };
+        await alumno.save();
+        await alumno.populate('plan', CAMPOS_PLAN);
+
+        avisarCambio(req);
+        res.json(alumno);
+    } catch (error) {
+        responderError(res, error, 'Error al guardar la ficha de salud');
+    }
+});
+
+router.delete('/:id/ficha', async (req, res) => {
+    try {
+        const alumno = await conPlan(
+            Alumno.findByIdAndUpdate(req.params.id, { fichaSalud: { url: '', fecha: null, vence: null } }, { new: true })
+        );
+        if (!alumno) return res.status(404).json({ error: 'Alumno no encontrado' });
+
+        await FichaSalud.deleteOne({ alumno: alumno._id });
+        avisarCambio(req);
+        res.json(alumno);
+    } catch (error) {
+        responderError(res, error, 'Error al eliminar la ficha de salud');
     }
 });
 
