@@ -7,19 +7,19 @@ import { Boton, Campo, Cargando, claseInput } from '../components/ui';
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const BENEFICIOS = [
-    { icono: IdCard, texto: 'Registrá cada ingreso con el DNI en segundos.' },
+    { icono: IdCard, texto: 'Registrá la asistencia por DNI o por nombre, en segundos.' },
     { icono: CircleCheck, texto: 'Sabé al instante quién está al día y quién debe la cuota.' },
     { icono: Smartphone, texto: 'Usalo en la computadora de recepción o en el celular.' }
 ];
 
-// Ilustración de ejemplo (datos ficticios) de lo que se ve al registrar un ingreso.
+// Ilustración de ejemplo (datos ficticios) de lo que se ve al registrar una asistencia.
 // Se puede reemplazar por una foto real del gimnasio sin tocar el resto de la pantalla.
 function IlustracionInicio({ className = '' }) {
     return (
-        <svg viewBox="0 0 440 270" className={className} role="img" aria-label="Ejemplo de un ingreso registrado y del resumen de cuotas">
+        <svg viewBox="0 0 440 270" className={className} role="img" aria-label="Ejemplo de una asistencia registrada y del resumen de cuotas">
             {/* tarjeta principal */}
             <rect x="10" y="20" width="400" height="236" rx="22" fill="#1e293b" stroke="#ffffff" strokeOpacity="0.08" />
-            <text x="36" y="58" fill="#94a3b8" fontSize="13" fontWeight="600">INGRESO REGISTRADO · 18:42</text>
+            <text x="36" y="58" fill="#94a3b8" fontSize="13" fontWeight="600">ASISTENCIA REGISTRADA · 18:42</text>
 
             {/* alumno */}
             <circle cx="62" cy="100" r="26" fill="#334155" />
@@ -113,7 +113,7 @@ export default function InicioPage() {
                 {/* my-auto centra el bloque en pantallas altas; pt-10 asegura aire bajo el logo en las bajas */}
                 <div className="max-w-lg pt-10 lg:my-auto">
                     <h1 className="text-3xl font-bold tracking-tight text-balance sm:text-4xl xl:text-5xl">
-                        Cuotas e ingresos del gimnasio, <span className="text-emerald-400">bajo control.</span>
+                        Cuotas y asistencias del gimnasio, <span className="text-emerald-400">bajo control.</span>
                     </h1>
                     <p className="mt-4 text-base text-pretty text-slate-300 sm:text-lg">
                         Todo lo que necesita la recepción en un solo lugar: quién entra, quién está al día y a quién hay que
@@ -133,7 +133,7 @@ export default function InicioPage() {
                 </div>
             </section>
 
-            {/* Formulario de ingreso */}
+            {/* Formulario para iniciar sesión */}
             <section className="flex items-center justify-center px-4 py-10 sm:px-6 lg:py-12">
                 <div className="w-full max-w-sm">
                     <h2 className="text-2xl font-bold tracking-tight text-slate-900">Ingresá a tu cuenta</h2>

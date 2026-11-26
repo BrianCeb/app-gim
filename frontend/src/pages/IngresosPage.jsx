@@ -16,7 +16,7 @@ export default function IngresosPage() {
 
     return (
         <>
-            <Encabezado titulo="Ingresos" descripcion="Registrá la entrada de cada alumno con su DNI." />
+            <Encabezado titulo="Asistencia" descripcion="Registrá la entrada de cada alumno por DNI o por nombre." />
 
             <div className="grid gap-6 lg:grid-cols-5">
                 <div className="lg:col-span-2">
@@ -26,10 +26,10 @@ export default function IngresosPage() {
                 <Tarjeta className="lg:col-span-3">
                     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
                         <div>
-                            <h2 className="font-semibold text-slate-900">{esHoy ? 'Ingresos de hoy' : 'Ingresos del día'}</h2>
+                            <h2 className="font-semibold text-slate-900">{esHoy ? 'Asistencias de hoy' : 'Asistencias del día'}</h2>
                             <p className="text-sm text-slate-500">
                                 <span className="inline-block first-letter:uppercase">{formatearFechaLarga(dia)}</span> · {delDia.length}{' '}
-                                {delDia.length === 1 ? 'ingreso' : 'ingresos'}
+                                {delDia.length === 1 ? 'asistencia' : 'asistencias'}
                             </p>
                         </div>
                         <label>
@@ -45,9 +45,9 @@ export default function IngresosPage() {
                     </div>
 
                     {cargando ? (
-                        <Cargando texto="Cargando ingresos…" />
+                        <Cargando texto="Cargando asistencias…" />
                     ) : delDia.length === 0 ? (
-                        <EstadoVacio icono={Clock} titulo="Sin ingresos" descripcion={esHoy ? 'Todavía nadie ingresó hoy.' : 'No hubo ingresos ese día.'} />
+                        <EstadoVacio icono={Clock} titulo="Sin asistencias" descripcion={esHoy ? 'Todavía nadie entró hoy.' : 'Nadie entró ese día.'} />
                     ) : (
                         <ul className="divide-y divide-slate-100">
                             {delDia.map((ingreso) => {
