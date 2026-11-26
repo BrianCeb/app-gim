@@ -35,7 +35,7 @@ function parsearFecha(valor) {
 }
 
 // Campos del plan que viajan junto con cada alumno (para mostrar nombre, precio y estado de pago)
-const CAMPOS_PLAN = 'nombre duracion precio diasAviso activo';
+const CAMPOS_PLAN = 'nombre duracion precio diasAviso clasesPorSemana activo';
 
 // Completa el plan del alumno (o de una lista de alumnos) con sus datos, en lugar de solo el _id
 function conPlan(consulta) {

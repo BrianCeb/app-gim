@@ -3,7 +3,7 @@ import { CircleCheck, CircleOff, Pencil, Plus, Tags } from 'lucide-react';
 import { useDatos } from '../context/DatosContext';
 import { useAvisos } from '../context/AvisosContext';
 import { api } from '../lib/api';
-import { formatearPrecio, textoDuracion } from '../lib/planes';
+import { formatearPrecio, textoClases, textoDuracion } from '../lib/planes';
 import AjustesTabs from '../components/AjustesTabs';
 import PlanForm from '../components/PlanForm';
 import { Confirmacion, Modal } from '../components/Modal';
@@ -126,7 +126,10 @@ export default function PlanesPage() {
                                 {planes.map((plan) => (
                                     <tr key={plan._id} className={`hover:bg-slate-50/60 ${plan.activo ? '' : 'text-slate-400'}`}>
                                         <td className={`px-5 py-3 font-medium ${plan.activo ? 'text-slate-900' : 'text-slate-500'}`}>{plan.nombre}</td>
-                                        <td className="px-3 py-3 text-slate-600">{textoDuracion(plan.duracion)}</td>
+                                        <td className="px-3 py-3 text-slate-600">
+                                            {textoDuracion(plan.duracion)}
+                                            <span className="block text-xs text-slate-500">{textoClases(plan.clasesPorSemana)}</span>
+                                        </td>
                                         <td className="px-3 py-3 text-right text-slate-900 tabular-nums">{formatearPrecio(plan.precio)}</td>
                                         <td className="px-3 py-3 text-slate-600">{plan.diasAviso} {plan.diasAviso === 1 ? 'día' : 'días'} antes</td>
                                         <td className="px-3 py-3 text-slate-600 tabular-nums">{alumnosPorPlan.get(plan._id) ?? 0}</td>
@@ -147,7 +150,7 @@ export default function PlanesPage() {
                                         <div className="min-w-0">
                                             <p className={`truncate font-medium ${plan.activo ? 'text-slate-900' : 'text-slate-500'}`}>{plan.nombre}</p>
                                             <p className="text-sm text-slate-500">
-                                                {textoDuracion(plan.duracion)} · {textoAlumnos(alumnosPorPlan.get(plan._id) ?? 0)}
+                                                {textoDuracion(plan.duracion)} · {textoClases(plan.clasesPorSemana)} · {textoAlumnos(alumnosPorPlan.get(plan._id) ?? 0)}
                                             </p>
                                         </div>
                                         <p className="font-semibold text-slate-900 tabular-nums">{formatearPrecio(plan.precio)}</p>
