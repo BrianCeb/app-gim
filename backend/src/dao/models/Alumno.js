@@ -12,6 +12,9 @@ const alumnoSchema = new mongoose.Schema({
     // (lo controla alumnos.router.js); acá no se marca required para que los alumnos cargados
     // antes de la HU 11 se puedan seguir guardando hasta correr la migración de planes
     plan: { type: mongoose.Schema.Types.ObjectId, ref: 'Plan', index: true },
+    // Clase (turno) a la que viene el alumno: un alumno, una clase. Opcional: hay alumnos
+    // que vienen libremente, sin turno fijo. index: para armar rápido la lista de cada clase
+    clase: { type: mongoose.Schema.Types.ObjectId, ref: 'Clase', default: null, index: true },
     fotoUrl: { type: String, default: '' },
     // Ficha de salud (apto físico): el archivo vive en la colección FichaSalud. Acá queda solo
     // el resumen, para que el listado avise quién no la tiene o la tiene vencida sin bajar archivos.

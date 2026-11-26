@@ -64,6 +64,11 @@ export const api = {
     crearPlan: (datos) => pedir('/api/planes', { method: 'POST', body: datos }),
     editarPlan: (id, datos) => pedir(`/api/planes/${id}`, { method: 'PUT', body: datos }),
 
+    // Clases (turnos): verlas, cualquiera con sesión; crear y editar, solo administración
+    clases: () => pedir('/api/clases'),
+    crearClase: (datos) => pedir('/api/clases', { method: 'POST', body: datos }),
+    editarClase: (id, datos) => pedir(`/api/clases/${id}`, { method: 'PUT', body: datos }),
+
     // Anular un pago (solo administración y solo el último del alumno; si no, la API responde 403 o 409)
     anularPago: (id) => pedir(`/api/pagos/${id}/anular`, { method: 'POST' }),
 

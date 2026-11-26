@@ -4,6 +4,7 @@ import { useDatos } from '../context/DatosContext';
 import { diaArgentinoISO, formatearFechaLarga, formatearHora, hoyISO } from '../lib/fechas';
 import { nombreCompleto } from '../lib/alumnos';
 import IngresoRapido from '../components/IngresoRapido';
+import ListaClase from '../components/ListaClase';
 import { Avatar, Cargando, Encabezado, EstadoBadge, EstadoVacio, Tarjeta, claseInput } from '../components/ui';
 
 export default function IngresosPage() {
@@ -19,8 +20,10 @@ export default function IngresosPage() {
             <Encabezado titulo="Asistencia" descripcion="Registrá la entrada de cada alumno por DNI o por nombre." />
 
             <div className="grid gap-6 lg:grid-cols-5">
-                <div className="lg:col-span-2">
+                {/* Dos formas de registrar: buscando al alumno, o marcándolo en la lista de su clase */}
+                <div className="space-y-6 lg:col-span-2">
                     <IngresoRapido />
+                    <ListaClase />
                 </div>
 
                 <Tarjeta className="lg:col-span-3">
