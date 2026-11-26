@@ -4,15 +4,21 @@ import { CalendarCheck } from 'lucide-react';
 import { useDatos } from '../context/DatosContext';
 import { diaArgentinoISO, estadoPago, formatearFechaLarga, hoyISO, textoVencimiento } from '../lib/fechas';
 import { nombreCompleto } from '../lib/alumnos';
+import { fichaARevisar } from '../lib/fichaSalud';
 import IngresoRapido from '../components/IngresoRapido';
 import RegistrarPago from '../components/RegistrarPago';
 import { Avatar, Boton, Cargando, EstadoBadge, EstadoVacio, Tarjeta } from '../components/ui';
 
-function Indicador({ titulo, valor, a, acento = 'text-slate-900' }) {
+// ancho: el bloque que en celular ocupa las dos columnas. Ahí el número va al lado del texto
+// (una sola línea, en vez de dos) para que abajo siga entrando "Cuotas a revisar".
+// Desde 640 px vuelve a ser igual a los demás.
+function Indicador({ titulo, valor, a, acento = 'text-slate-900', ancho = false, className = '' }) {
     return (
-        <Link to={a} className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-900/5 transition hover:ring-slate-900/15">
-            <p className="text-sm text-slate-500">{titulo}</p>
-            <p className={`mt-1 text-3xl font-bold tracking-tight ${acento}`}>{valor}</p>
+        <Link to={a} className={`rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-900/5 transition hover:ring-slate-900/15 ${className}`}>
+            <div className={ancho ? 'flex items-center justify-between gap-3 sm:block' : ''}>
+                <p className="text-sm text-slate-500">{titulo}</p>
+                <p className={`text-3xl font-bold tracking-tight ${acento} ${ancho ? 'sm:mt-1' : 'mt-1'}`}>{valor}</p>
+            </div>
         </Link>
     );
 }
@@ -28,7 +34,9 @@ export default function PanelPage() {
             alDia: conEstado.filter((x) => x.clave === 'alDia').length,
             porVencer: conEstado.filter((x) => x.clave === 'porVencer').length,
             vencidos: conEstado.filter((x) => x.clave === 'vencido').length,
-            ingresosHoy: ingresos.filter((i) => diaArgentinoISO(i.fecha) === hoy).length,
+            asistenciasHoy: ingresos.filter((i) => diaArgentinoISO(i.fecha) === hoy).length,
+            // Alumnos entrenando sin apto físico válido: nunca lo entregaron o ya les venció
+            fichaARevisar: alumnos.filter(fichaARevisar).length,
             // Los que necesitan atención: vencidos y por vencer, primero los más urgentes
             atencion: conEstado.filter((x) => x.clave !== 'alDia').sort((a, b) => a.dias - b.dias)
         };
@@ -45,11 +53,22 @@ export default function PanelPage() {
                 <div className="space-y-6 lg:col-span-3">
                     <IngresoRapido />
 
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                        <Indicador titulo="Ingresos hoy" valor={resumen.ingresosHoy} a="/ingresos" />
+                    {/* Cinco bloques de lectura rápida: la asistencia del día, los tres estados de cuota
+                        y las fichas de salud a revisar. En celular la grilla se reduce a 2 columnas y el
+                        quinto bloque ocupa las dos, para no dejar un hueco */}
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                        <Indicador titulo="Asistencias hoy" valor={resumen.asistenciasHoy} a="/ingresos" />
                         <Indicador titulo="Al día" valor={resumen.alDia} a="/pagos?estado=alDia" acento="text-emerald-600" />
                         <Indicador titulo="Por vencer" valor={resumen.porVencer} a="/pagos?estado=porVencer" acento="text-amber-600" />
                         <Indicador titulo="Vencidos" valor={resumen.vencidos} a="/pagos?estado=vencido" acento="text-rose-600" />
+                        <Indicador
+                            titulo="Ficha a revisar"
+                            valor={resumen.fichaARevisar}
+                            a="/alumnos?ficha=pendiente"
+                            acento={resumen.fichaARevisar > 0 ? 'text-amber-600' : 'text-slate-900'}
+                            ancho
+                            className="max-sm:col-span-2"
+                        />
                     </div>
                 </div>
 

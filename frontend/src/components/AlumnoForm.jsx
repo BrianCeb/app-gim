@@ -1,14 +1,15 @@
 import { useRef, useState } from 'react';
-import { Camera, CircleAlert, Trash2 } from 'lucide-react';
+import { Camera, CircleAlert, FileText, Paperclip, Trash2 } from 'lucide-react';
 import { api } from '../lib/api';
 import { fechaAISO, formatearFecha, hoyISO, sumarDuracion } from '../lib/fechas';
 import { formatearPrecio, textoDuracion, textoPlan } from '../lib/planes';
 import { validarMedio } from '../lib/pagos';
 import { achicarImagen } from '../lib/imagen';
+import { leerFichaSalud } from '../lib/archivo';
 import { normalizarDni, validarAlumno } from '../lib/alumnos';
 import { useDatos } from '../context/DatosContext';
 import { useAvisos } from '../context/AvisosContext';
-import { Boton, Campo, claseInput } from './ui';
+import { Boton, Campo, FichaBadge, claseInput } from './ui';
 import SelectorMedio from './SelectorMedio';
 
 // Formulario para crear (alumno = null) o editar un alumno, incluida su foto
@@ -16,6 +17,7 @@ export default function AlumnoForm({ alumno, onTerminar }) {
     const { recargarAlumnos, planesActivos } = useDatos();
     const avisar = useAvisos();
     const inputFoto = useRef(null);
+    const inputFicha = useRef(null);
 
     const [datos, setDatos] = useState({
         nombre: alumno?.nombre ?? '',
@@ -34,6 +36,11 @@ export default function AlumnoForm({ alumno, onTerminar }) {
     const [guardando, setGuardando] = useState(false);
     // foto: null = sin cambios, { dataUrl } = foto nueva, { quitar: true } = borrar la actual
     const [foto, setFoto] = useState(null);
+    // Ficha de salud (apto físico), con la misma idea que la foto: null = sin cambios,
+    // { dataUrl, nombre } = archivo nuevo, { quitar: true } = borrar la que tenía.
+    // La fecha es la del certificado del médico y solo se pide cuando se adjunta un archivo nuevo
+    const [ficha, setFicha] = useState(null);
+    const [fechaFicha, setFechaFicha] = useState(hoyISO());
 
     // Opciones del selector: los planes activos y, si el alumno tiene uno que ya no se ofrece, también ese
     const planActualInactivo = alumno?.plan && !alumno.plan.activo ? alumno.plan : null;
@@ -41,6 +48,8 @@ export default function AlumnoForm({ alumno, onTerminar }) {
     const planElegido = opcionesPlan.find((p) => p._id === datos.plan);
 
     const vistaPrevia = foto?.dataUrl ?? (foto?.quitar ? null : alumno?.fotoUrl || null);
+    // Ficha que el alumno ya tiene guardada (null en el alta o si nunca entregó el apto)
+    const fichaActual = alumno?.fichaSalud?.url ? alumno.fichaSalud : null;
 
     const cambiar = (campo) => (e) => {
         setDatos((d) => ({ ...d, [campo]: e.target.value }));
@@ -59,12 +68,29 @@ export default function AlumnoForm({ alumno, onTerminar }) {
         }
     };
 
+    const elegirFicha = async (e) => {
+        const archivo = e.target.files?.[0];
+        e.target.value = '';
+        if (!archivo) return;
+        try {
+            setFicha(await leerFichaSalud(archivo));
+            setErrores((err) => ({ ...err, fichaSalud: undefined }));
+        } catch (err) {
+            avisar('error', err.message);
+        }
+    };
+
     const guardar = async (e) => {
         e.preventDefault();
         setErrorGeneral('');
 
         const nuevosErrores = validarAlumno(datos);
         if (!alumno && validarMedio(medio)) nuevosErrores.medio = validarMedio(medio);
+        // La ficha es opcional, pero si se adjunta una hace falta la fecha del apto para saber cuándo vence
+        if (ficha?.dataUrl) {
+            if (!fechaFicha) nuevosErrores.fichaSalud = 'Indicá la fecha del apto físico.';
+            else if (fechaFicha > hoyISO()) nuevosErrores.fichaSalud = 'La fecha del apto no puede ser futura.';
+        }
         setErrores(nuevosErrores);
         if (Object.keys(nuevosErrores).length > 0) return;
 
@@ -79,14 +105,24 @@ export default function AlumnoForm({ alumno, onTerminar }) {
             return;
         }
 
-        // El alumno ya quedó guardado; si la foto falla, se avisa pero no se pierde lo demás
+        // El alumno ya quedó guardado; la foto y la ficha son archivos aparte, así que si una falla
+        // se avisa pero no se pierde lo demás
+        const problemas = [];
         try {
             if (foto?.dataUrl) await api.subirFoto(guardado._id, foto.dataUrl);
             else if (foto?.quitar && alumno?.fotoUrl) await api.eliminarFoto(guardado._id);
-            avisar('exito', alumno ? 'Cambios guardados.' : `${guardado.nombre} ${guardado.apellido} fue agregado.`);
         } catch (err) {
-            avisar('alerta', `El alumno se guardó, pero hubo un problema con la foto: ${err.message}`);
+            problemas.push(`la foto (${err.message})`);
         }
+        try {
+            if (ficha?.dataUrl) await api.subirFicha(guardado._id, ficha.dataUrl, fechaFicha, ficha.nombre);
+            else if (ficha?.quitar && alumno?.fichaSalud?.url) await api.eliminarFicha(guardado._id);
+        } catch (err) {
+            problemas.push(`la ficha de salud (${err.message})`);
+        }
+
+        if (problemas.length > 0) avisar('alerta', `El alumno se guardó, pero hubo un problema con ${problemas.join(' y con ')}.`);
+        else avisar('exito', alumno ? 'Cambios guardados.' : `${guardado.nombre} ${guardado.apellido} fue agregado.`);
 
         await recargarAlumnos().catch(() => {});
         setGuardando(false);
@@ -164,6 +200,86 @@ export default function AlumnoForm({ alumno, onTerminar }) {
                 </Campo>
             </div>
 
+            {/* Ficha de salud: es opcional para poder guardar (en el mostrador no siempre la traen),
+                pero si falta el alumno queda marcado en el listado y en el Panel */}
+            <div className="space-y-3 rounded-xl bg-slate-50 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                        <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                            <FileText className="size-4 text-slate-500" aria-hidden />
+                            Ficha de salud (apto físico)
+                        </h3>
+                        <p className="mt-0.5 text-sm text-slate-500">PDF o foto del certificado. Vale un año desde la fecha del apto.</p>
+                    </div>
+                    {alumno && !ficha && <FichaBadge alumno={alumno} todos />}
+                </div>
+
+                {ficha?.dataUrl ? (
+                    <p className="flex items-center gap-2 text-sm text-slate-700">
+                        <Paperclip className="size-4 shrink-0 text-slate-500" aria-hidden />
+                        <span className="min-w-0 flex-1 truncate font-medium">{ficha.nombre}</span>
+                    </p>
+                ) : fichaActual && !ficha?.quitar ? (
+                    <p className="text-sm text-slate-700">
+                        Apto del <strong className="font-semibold">{formatearFecha(fichaActual.fecha)}</strong>, vence el{' '}
+                        <strong className="font-semibold">{formatearFecha(fichaActual.vence)}</strong>.{' '}
+                        <a
+                            href={fichaActual.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-medium text-slate-900 underline decoration-slate-400 hover:decoration-slate-900"
+                        >
+                            Ver ficha
+                        </a>
+                    </p>
+                ) : (
+                    <p className="text-sm text-slate-500">
+                        {ficha?.quitar
+                            ? 'Al guardar se va a quitar la ficha cargada.'
+                            : 'Todavía no hay ficha. El alumno se puede guardar igual y queda marcado como “Sin ficha”.'}
+                    </p>
+                )}
+
+                <div className="flex flex-wrap items-center gap-3">
+                    <Boton type="button" variante="secundario" onClick={() => inputFicha.current?.click()} className="py-2">
+                        <Paperclip className="size-4" aria-hidden />
+                        {fichaActual || ficha?.dataUrl ? 'Reemplazar ficha' : 'Adjuntar ficha'}
+                    </Boton>
+                    {(ficha?.dataUrl || (fichaActual && !ficha?.quitar)) && (
+                        <button
+                            type="button"
+                            onClick={() => setFicha(ficha?.dataUrl ? null : { quitar: true })}
+                            className="inline-flex items-center gap-1 text-sm font-medium text-rose-600 hover:text-rose-500"
+                        >
+                            <Trash2 className="size-3.5" aria-hidden /> {ficha?.dataUrl ? 'Descartar archivo' : 'Quitar ficha'}
+                        </button>
+                    )}
+                    <input ref={inputFicha} type="file" accept="application/pdf,image/*" onChange={elegirFicha} className="hidden" />
+                </div>
+
+                {/* La fecha del certificado solo se pide con un archivo nuevo: de ella sale el vencimiento */}
+                {ficha?.dataUrl && (
+                    <div className="max-w-56">
+                        <Campo
+                            etiqueta="Fecha del apto"
+                            error={errores.fichaSalud}
+                            ayuda={fechaFicha && `Vence el ${formatearFecha(vencimientoApto(fechaFicha))}.`}
+                        >
+                            <input
+                                type="date"
+                                value={fechaFicha}
+                                max={hoyISO()}
+                                onChange={(e) => {
+                                    setFechaFicha(e.target.value);
+                                    setErrores((err) => ({ ...err, fichaSalud: undefined }));
+                                }}
+                                className={claseInput(errores.fichaSalud)}
+                            />
+                        </Campo>
+                    </div>
+                )}
+            </div>
+
             {!alumno && (
                 <div className="space-y-2">
                     <SelectorMedio
@@ -192,6 +308,13 @@ export default function AlumnoForm({ alumno, onTerminar }) {
             </div>
         </form>
     );
+}
+
+// El apto físico vale un año desde la fecha del certificado (igual que vencimientoFicha en el backend).
+// Trabaja con textos "YYYY-MM-DD"; un apto del 29/2 vence el 1/3 del año siguiente
+function vencimientoApto(iso) {
+    const [anio, mes, dia] = iso.split('-').map(Number);
+    return new Date(Date.UTC(anio + 1, mes - 1, dia)).toISOString().slice(0, 10);
 }
 
 // Texto de ayuda con el vencimiento que va a quedar (mismas reglas que el backend):

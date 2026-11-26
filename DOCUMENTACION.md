@@ -61,11 +61,11 @@ La aplicación tiene una pantalla pública de **Inicio** y seis secciones que re
 | Sección | Qué permite hacer |
 |---|---|
 | **Inicio** (`/ingresar`) | Propuesta de valor de la aplicación y formulario de ingreso (email y contraseña). Es la única pantalla que se ve sin sesión. |
-| **Panel** | Registrar un ingreso por DNI; ver ingresos del día y cantidad de alumnos al día, por vencer y vencidos; lista de "cuotas a revisar" con botón "Pagó". |
-| **Ingresos** | Registrar ingresos y ver el listado de ingresos de cualquier día (hora, alumno, estado de su cuota). |
-| **Alumnos** | Listado completo con el plan de cada alumno; búsqueda por nombre, apellido o DNI (sin importar tildes ni puntos); filtro por estado; alta (con plan y medio del primer pago obligatorios), edición, eliminación con confirmación, registro de pago y foto. |
+| **Panel** | Registrar una asistencia por DNI o por nombre; ver asistencias del día, cantidad de alumnos al día, por vencer y vencidos, y cuántas fichas de salud hay que revisar; lista de "cuotas a revisar" con botón "Pagó". |
+| **Asistencia** (`/ingresos`) | Registrar la entrada buscando por DNI o por nombre y ver el listado de asistencias de cualquier día (hora, alumno, estado de su cuota). En los datos sigue llamándose *ingreso*: cambió el lenguaje de la interfaz, no el modelo. |
+| **Alumnos** | Listado completo con el plan de cada alumno; búsqueda por nombre, apellido o DNI (sin importar tildes ni puntos); filtro por estado; alta (con plan y medio del primer pago obligatorios), edición, eliminación con confirmación, registro de pago, foto y ficha de salud; aviso y filtro de a quién le falta el apto físico o lo tiene vencido. |
 | **Pagos** | Alumnos ordenados por vencimiento (los más urgentes primero), con su plan y precio vigente; filtro por estado; botón para registrar el pago con su medio (se puede cambiar de plan al pagar) y botón **Historial** con todos los pagos del alumno (HU 12). |
-| **Estadísticas** | Gráfico de barras de ingresos por día (últimos 30 días), promedio diario, total de alumnos y gráfico de torta con el estado de las cuotas. |
+| **Estadísticas** | Gráfico de barras de asistencias por día (últimos 30 días), promedio diario, total de alumnos y gráfico de torta con el estado de las cuotas. |
 | **Ajustes → Planes** (`/planes`) | Planes de cuota: alta (nombre, duración, precio y días de aviso), edición, activar o desactivar. Muestra cuántos alumnos tiene cada plan. Solo administración. |
 | **Ajustes → Personal** (`/personal`) | Cuentas para ingresar a la app: alta (nombre, email, rol y contraseña), edición, activar o desactivar con confirmación y cambio de contraseña. Solo administración. |
 
@@ -109,9 +109,25 @@ Además:
 - El **DNI** es único por alumno. Se aceptan puntos o espacios ("12.345.678") y se guarda solo con
   números ("12345678"). Debe tener entre 6 y 9 dígitos.
 - Son obligatorios: nombre, apellido, DNI, email válido, fecha de pago y plan.
-- Un ingreso solo se registra si existe un alumno con ese DNI. El ingreso se registra aunque la cuota
+- Una asistencia solo se registra si existe el alumno. Se busca por DNI (único: con el DNI completo
+  alcanza con Enter) o por nombre, eligiendo de la lista de coincidencias. Se registra aunque la cuota
   esté vencida, pero la pantalla lo avisa claramente en rojo.
 - Las fechas se muestran en formato argentino (dd/mm/aaaa).
+
+### Ficha de salud — apto físico
+Confirmada por Brian (25/11/2026):
+- La ficha es el **apto físico**: un PDF escaneado o una foto del certificado (JPG, PNG o WEBP),
+  de hasta 4 MB. Las fotos se achican en el navegador a 1400 px de lado (legible y liviano); el PDF
+  se sube tal cual, porque es el documento que firmó el profesional.
+- Es **opcional para dar de alta**: en el mostrador muchos se anotan y traen el apto después. En vez
+  de bloquear el alta, el alumno queda marcado y el reclamo queda a la vista.
+- Al subirla se pide la **fecha del apto** (la del certificado, no la de la carga). No puede ser futura.
+- El apto **vale un año** desde esa fecha. Estados: *sin ficha*, *vencida*, *por vencer* (faltan 30 días
+  o menos) y *al día*. Un apto del 29/2 vence el 1/3 del año siguiente.
+- **"Ficha a revisar"** = sin ficha + vencida: es el número del Panel y el filtro de Alumnos.
+- Hay **una ficha por alumno**: cargar una nueva reemplaza la anterior (así se renueva). No se guarda
+  el historial de aptos. Al eliminar un alumno también se borra su ficha.
+- Cualquier rol con sesión puede verla y cargarla; eliminar al alumno sigue siendo solo de administración.
 
 ### Planes de cuota (HU 11)
 Confirmadas por Brian (15/11/2026):
@@ -343,6 +359,9 @@ gimnasio-app/
 | `fechaVencimiento` | Date | Calculada según el plan (ver reglas de la HU 11). |
 | `plan` | ObjectId | Referencia al plan de cuota (con índice). Obligatorio al dar de alta (lo controla la ruta; en el esquema no es `required` para no romper datos sin migrar). |
 | `fotoUrl` | String | Ruta a la foto (`/api/alumnos/:id/foto?v=...`) o vacío. |
+| `fichaSalud.url` | String | Ruta a la ficha de salud (`/api/alumnos/:id/ficha?v=...`) o vacío si no la entregó. |
+| `fichaSalud.fecha` | Date | Fecha del apto físico que figura en el certificado, o `null`. |
+| `fichaSalud.vence` | Date | Un año después de `fecha`, o `null`. Copia en el alumno para que el listado avise sin bajar archivos. |
 
 ### Colección `ingresos` (modelo `Ingreso`)
 | Campo | Tipo | Detalle |
@@ -371,6 +390,19 @@ con el DNI guardado.
 
 Los ingresos anteriores a este cambio se vinculan una vez con `npm run migrar:ingresos` (ver
 sección 13).
+
+### Colección `fichasaluds` (modelo `FichaSalud`)
+| Campo | Tipo | Detalle |
+|---|---|---|
+| `alumno` | ObjectId | Referencia al alumno (único: una ficha por alumno; cargar otra reemplaza la anterior). |
+| `data` | Buffer | PDF o imagen en binario. |
+| `contentType` | String | `application/pdf`, `image/jpeg`, `image/png` o `image/webp`. |
+| `nombreArchivo` | String | Nombre del archivo elegido, sin carpetas ni comillas (viaja en `Content-Disposition`). |
+| `fecha` | Date | Fecha del apto físico. |
+| `vence` | Date | `fecha` + 1 año. |
+
+Se guarda aparte del alumno por la misma razón que la foto: el listado de alumnos se pide entero
+en cada carga y no tiene que arrastrar archivos de varios MB.
 
 ### Colección `plans` (modelo `Plan`)
 Planes de cuota (Mongoose nombra la colección `plans`).
@@ -459,15 +491,18 @@ permiso, **403**.
 | POST | `/api/alumnos` | sesión | Crear alumno (`plan` obligatorio y activo; `medio` obligatorio). Registra el primer pago en el historial | 201, 400 (datos inválidos, plan inexistente/inactivo o sin medio), 409 (DNI repetido) |
 | GET | `/api/alumnos/dni/:dni` | sesión | Buscar alumno por DNI | 200, 404 |
 | PUT | `/api/alumnos/:id` | sesión | Editar alumno (`plan` opcional; recalcula el vencimiento solo si cambia la fecha de pago) | 200, 400, 404, 409 |
-| DELETE | `/api/alumnos/:id` | **admin** | Eliminar alumno y su foto (sus pagos se conservan) | 200, 400 (ID inválido), 403, 404 |
+| DELETE | `/api/alumnos/:id` | **admin** | Eliminar alumno, su foto y su ficha de salud (sus pagos se conservan) | 200, 400 (ID inválido), 403, 404 |
 | POST | `/api/alumnos/:id/pago` | sesión | Registrar pago (`medio` obligatorio; `fechaPago` opcional, por defecto hoy; `plan` opcional, por defecto el suyo, tiene que estar activo). Devuelve el alumno y, en `pago`, el registro del historial | 200, 400, 404 |
 | GET | `/api/alumnos/:id/pagos` | sesión | Historial de pagos del alumno, del más reciente al más viejo (incluye los anulados) | 200, 400, 404 |
 | POST | `/api/pagos/:id/anular` | **admin** | Anular el último pago vigente del alumno (el alumno vuelve al estado anterior) | 200, 400 (ID inválido), 403, 404, 409 (no es el último, ya anulado o es el del alta) |
+| GET | `/api/alumnos/:id/ficha` | sesión | Obtener la ficha de salud (PDF o imagen, `inline`) | 200 (archivo), 404 |
+| PUT | `/api/alumnos/:id/ficha` | sesión | Subir la ficha (`archivo` como data URL base64, `fecha` del apto obligatoria y no futura, `nombreArchivo` opcional). Calcula el vencimiento al año | 200, 400, 404, 413 (más de 4 MB) |
+| DELETE | `/api/alumnos/:id/ficha` | sesión | Quitar la ficha de salud | 200, 404 |
 | GET | `/api/alumnos/:id/foto` | sesión | Obtener la foto | 200 (imagen), 404 |
 | PUT | `/api/alumnos/:id/foto` | sesión | Subir foto (`imagen` como data URL base64) | 200, 400, 404, 413 |
 | DELETE | `/api/alumnos/:id/foto` | sesión | Quitar la foto | 200, 404 |
 | GET | `/api/ingresos` | sesión | Lista de ingresos, más recientes primero | 200 |
-| POST | `/api/ingresos` | sesión | Registrar ingreso por `dni`; devuelve también el alumno | 201, 400, 404 |
+| POST | `/api/ingresos` | sesión | Registrar la asistencia por `dni`; devuelve también el alumno. Buscar por nombre es del lado del cliente: se elige un alumno y se envía su DNI | 201, 400, 404 |
 | GET | `/api/planes` | sesión | Planes (activos primero, por nombre), incluidos los desactivados | 200 |
 | POST | `/api/planes` | **admin** | Crear plan (`nombre`, `duracion: { cantidad, unidad }`, `precio`, `diasAviso` opcional) | 201, 400, 403, 409 (nombre repetido) |
 | PUT | `/api/planes/:id` | **admin** | Editar plan (mismos campos + `activo`, booleano obligatorio). No hay DELETE: se desactiva | 200, 400, 403, 404, 409 |
@@ -562,6 +597,22 @@ Respuesta `201 Created`: el alumno guardado con `_id`, `dni: "12345678"`,
   - `useFiltroEstado(alumnos, { enUrl })` calcula el estado de cada alumno, las cantidades por estado y
     el filtro elegido. Antes ese código estaba copiado en Pagos y en Alumnos. En Pagos el filtro vive en
     la dirección (`?estado=vencido`, para llegar desde el Panel); en Alumnos, solo en memoria.
+  - `useBuscarAlumno(texto)` busca sobre los alumnos que ya están en `DatosContext` (sin pedirle nada al
+    servidor en cada tecla) y devuelve `{ sugerencias, exacto, total }`: `exacto` es el alumno cuyo DNI
+    coincide entero, y `sugerencias` las coincidencias por nombre, apellido o parte del DNI, sin tildes.
+- **Registrar asistencia (`IngresoRapido`):** el campo acepta DNI o nombre. Con el DNI completo (o una
+  sola coincidencia) Enter registra directo, que es el camino rápido del mostrador; con un nombre
+  ambiguo aparece la lista con foto, DNI y estado, y se elige. Al registrar, además del estado de la
+  cuota avisa si al alumno le falta el apto físico: es el momento en que lo tenés enfrente para pedírselo.
+  En los datos la colección sigue llamándose `ingresos`; "asistencia" es el lenguaje de la interfaz.
+- **Ficha de salud en el formulario del alumno:** bloque aparte con el estado actual ("Sin ficha",
+  "Ficha vencida", "Ficha al día"), enlace para abrir el archivo, botón para adjuntar o reemplazar y la
+  fecha del apto, que solo se pide cuando hay archivo nuevo. El alumno se guarda primero y los archivos
+  después: si falla la foto o la ficha, se avisa cuál falló pero el alumno no se pierde.
+- **Ficha en el listado y en el Panel:** la pastilla de ficha solo aparece cuando hay algo para resolver,
+  para no competir con el estado de la cuota. El Panel suma un quinto indicador, "Ficha a revisar", que
+  lleva a `/alumnos?ficha=pendiente`; en celular ocupa las dos columnas y pone el número al lado del
+  texto, para no empujar de más lo que sigue.
 - **Medio de pago con botones (`SelectorMedio`):** 4 botones grandes en vez de una lista desplegable:
   se ven todas las opciones y se eligen con un toque (más rápido en el mostrador y en el celular).
   Funcionan como un grupo de radio (`role="radiogroup"`, `aria-checked`) para lectores de pantalla.
@@ -674,6 +725,14 @@ Requisito: Node.js 22.12 o superior.
    Crear el plan "Mensual" y asignarlo a los alumnos sin plan (una sola vez; no toca vencimientos):
    ```bash
    npm run migrar:planes --prefix backend -- --aplicar
+   ```
+   Cargar datos de demostración para que el Panel y las Estadísticas no se vean vacíos
+   (20 alumnos ficticios con DNI `99xxxxxx`, sus asistencias de 90 días, 3 pagos cada uno y fichas
+   de salud de ejemplo). Sin `--aplicar` solo informa; `--borrar --aplicar` los saca y deja la base
+   como estaba:
+   ```bash
+   npm run seed:demo --prefix backend -- --aplicar
+   npm run seed:demo --prefix backend -- --borrar --aplicar
    ```
 3. Modo desarrollo (dos terminales):
    ```bash
@@ -845,7 +904,10 @@ Pruebas de aceptación a completar en producción (lista de verificación):
 - [ ] Edición de datos y recálculo del vencimiento.
 - [ ] Eliminación con confirmación.
 - [ ] Registrar pago y ver el cambio de estado.
-- [ ] Registrar ingreso por DNI (existente y no existente).
+- [ ] Registrar la asistencia por DNI y por nombre (existente y no existente).
+- [ ] Adjuntar una ficha de salud en PDF y otra como foto; abrirlas desde el formulario.
+- [ ] Un alumno sin ficha y uno con el apto vencido aparecen en "Ficha a revisar" (Panel y Alumnos).
+- [ ] Borrar los alumnos ficticios antes de la entrega final si no se quieren mostrar.
 - [ ] Corregir el DNI de un alumno con ingresos: en Ingresos sigue apareciendo con su nombre.
 - [ ] Subir y quitar foto.
 - [ ] Refrescar la página en cualquier sección.
@@ -862,6 +924,28 @@ Pruebas de aceptación a completar en producción (lista de verificación):
 - [ ] Cobrar con cada medio de pago y verlo en el historial con el monto correcto.
 - [ ] Con administración: anular el último pago y ver que el vencimiento vuelve al anterior.
 - [ ] Con recepción: ver el historial, sin el botón "Anular".
+
+### Asistencia por nombre y ficha de salud (25/11/2026)
+
+Probado contra la base real con un script que inicia sesión como administración (`fetch` sobre
+`http://localhost:3000`), el 25/11/2026:
+
+| Qué se probó | Resultado |
+|---|---|
+| `GET /api/alumnos` devuelve `fichaSalud` (url, fecha y vencimiento) | ✅ 23 alumnos, 17 con ficha |
+| `GET /api/alumnos/:id/ficha` | ✅ 200, `application/pdf`, empieza con `%PDF-`, `Content-Disposition: inline` |
+| `PUT` de una ficha nueva con la fecha del apto | ✅ 200, vencimiento calculado un año después |
+| Nombre de archivo con carpetas y comillas (`C:\carpetapto "raro".pdf`) | ✅ se guarda como `apto raro.pdf` |
+| `PUT` con fecha futura | ✅ 400 "La fecha del apto físico no puede ser futura." |
+| `PUT` sin fecha | ✅ 400 "Indicá la fecha del apto físico." |
+| `PUT` con un archivo `text/plain` | ✅ 400 "La ficha de salud debe ser un PDF o una imagen JPG, PNG o WEBP." |
+| `PUT` con un archivo de 5 MB | ✅ 413 (el tope del archivo son 4 MB) |
+| `DELETE` de la ficha y `GET` posterior | ✅ 200 con `fichaSalud.url` vacía y después 404 |
+| `POST /api/ingresos` por DNI | ✅ 201 con el alumno y la hora |
+| `npm run seed:demo -- --aplicar` | ✅ 20 alumnos, 60 pagos, 17 fichas y 829 asistencias; estados 12 al día / 4 por vencer / 4 vencidos y fichas 13 al día / 2 por vencer / 2 vencidas / 3 sin ficha |
+
+Pendiente de probar en pantalla (necesita una sesión abierta en el navegador): buscar por nombre en
+el Panel, adjuntar una ficha desde el formulario y el filtro "Ficha a revisar".
 
 ## 16. Evolución del proyecto y problemas resueltos
 

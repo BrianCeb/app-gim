@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { LoaderCircle } from 'lucide-react';
 import { ESTADOS, estadoPago } from '../lib/fechas';
+import { ESTADOS_FICHA, estadoFicha } from '../lib/fichaSalud';
 
 // Piezas visuales pequeñas que se repiten en varias pantallas
 
@@ -63,6 +64,22 @@ export function Tarjeta({ className = '', children }) {
 export function EstadoBadge({ alumno }) {
     const { clave } = estadoPago(alumno);
     const estado = ESTADOS[clave];
+    return (
+        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${estado.badge}`}>
+            <span className={`size-1.5 rounded-full ${estado.punto}`} aria-hidden />
+            {estado.etiqueta}
+        </span>
+    );
+}
+
+// Estado de la ficha de salud. Por defecto solo se muestra si hay algo para resolver
+// (sin ficha, vencida o por vencer): en el listado lo que importa es a quién le falta el apto.
+// Con todos={true} también muestra "Ficha al día" (se usa en el formulario del alumno).
+export function FichaBadge({ alumno, todos = false }) {
+    const { clave } = estadoFicha(alumno);
+    if (clave === 'alDia' && !todos) return null;
+
+    const estado = ESTADOS_FICHA[clave];
     return (
         <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${estado.badge}`}>
             <span className={`size-1.5 rounded-full ${estado.punto}`} aria-hidden />

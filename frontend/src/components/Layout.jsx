@@ -10,7 +10,7 @@ import { Boton, BotonIcono } from './ui';
 // rutas: otras rutas que también marcan la sección como activa (Ajustes tiene las pestañas Planes y Personal)
 const SECCIONES = [
     { a: '/', etiqueta: 'Panel', icono: LayoutDashboard },
-    { a: '/ingresos', etiqueta: 'Ingresos', icono: LogIn },
+    { a: '/ingresos', etiqueta: 'Asistencia', icono: LogIn },
     { a: '/alumnos', etiqueta: 'Alumnos', icono: Users },
     { a: '/pagos', etiqueta: 'Pagos', icono: Wallet },
     { a: '/estadisticas', etiqueta: 'Estadísticas', icono: ChartColumn, permiso: 'estadisticas' },

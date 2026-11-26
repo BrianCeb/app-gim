@@ -1,6 +1,6 @@
 # GimnasioApp
 
-App web para administrar el gimnasio: alumnos, cuotas, ingresos por DNI y estadísticas.
+App web para administrar el gimnasio: alumnos, cuotas, asistencias (por DNI o por nombre), fichas de salud y estadísticas.
 
 - **Backend:** Node + Express 5 + MongoDB Atlas (Mongoose). Socket.io solo avisa cambios para que las pantallas abiertas se actualicen solas.
 - **Frontend:** React + Vite + Tailwind CSS 4.
@@ -13,7 +13,7 @@ gimnasio-app/
 ├── backend/            # API Express
 │   ├── server.js
 │   ├── .env            # NO se sube a git (ver .env.example)
-│   ├── scripts/        # crearAdmin.js (seed del primer administrador), vincularIngresos.js y migrarPlanes.js (migraciones)
+│   ├── scripts/        # crearAdmin.js (seed del primer administrador), vincularIngresos.js y migrarPlanes.js (migraciones), seedDemo.js + pdfApto.js (datos de demostración)
 │   └── src/
 │       ├── config/      # db.js, auth.js (JWT y cookie)
 │       ├── middlewares/ # auth.js: requireAuth, requireRol
@@ -22,7 +22,7 @@ gimnasio-app/
 │       └── utils/       # vencimiento.js: cálculo del vencimiento según el plan
 ├── frontend/           # React
 │   └── src/
-│       ├── pages/       # Inicio, Panel, Ingresos, Alumnos, Pagos, Estadísticas, Planes, Personal
+│       ├── pages/       # Inicio, Panel, Asistencia, Alumnos, Pagos, Estadísticas, Planes, Personal
 │       ├── components/  # Layout, RutaProtegida, formularios, ui
 │       ├── context/     # sesión (AuthContext), datos compartidos y avisos
 │       ├── hooks/       # useAuth
@@ -60,14 +60,16 @@ La app abre en el **Inicio** (`/ingresar`): ingresá con el email y la contrase�
 - Cada pago queda en el historial con monto (precio del plan), medio y quién lo registró. Administración puede anular el último pago de un alumno: el vencimiento vuelve al anterior y el pago queda tachado, no se borra.
 - Las fechas se guardan a medianoche UTC y se muestran en formato argentino (dd/mm/aaaa).
 - Las fotos se achican en el navegador (máx. 400 px) y se guardan en MongoDB, en la colección `fotos`.
-- Cada ingreso guarda el `_id` del alumno (y el DNI de ese día): corregir el DNI de un alumno no le hace perder sus ingresos.
+- Cada asistencia guarda el `_id` del alumno (y el DNI de ese día): corregir el DNI de un alumno no le hace perder sus asistencias.
+- La ficha de salud (apto físico) es un PDF o una foto de hasta 4 MB, guardada en la colección `fichasaluds`. Es opcional al dar de alta; vale un año desde la fecha del certificado, y el Panel y Alumnos avisan a quién le falta o se le venció.
+- Para la demo: `npm run seed:demo --prefix backend -- --aplicar` carga 20 alumnos ficticios (DNI `99xxxxxx`) con asistencias, pagos y fichas; `-- --borrar --aplicar` los saca.
 
 ## Roles
 
 | Puede… | Recepción | Administración |
 |---|---|---|
-| Panel, Ingresos, Pagos | ✔ | ✔ |
-| Ver, crear y editar alumnos; registrar pagos y fotos | ✔ | ✔ |
+| Panel, Asistencia, Pagos | ✔ | ✔ |
+| Ver, crear y editar alumnos; registrar pagos, fotos y fichas de salud | ✔ | ✔ |
 | Ver el historial de pagos | ✔ | ✔ |
 | Anular el último pago de un alumno | — | ✔ |
 | Elegir el plan de un alumno y ver los precios | ✔ | ✔ |
@@ -92,13 +94,14 @@ Todas las rutas `/api` piden sesión, salvo login y logout. Sin sesión → **40
 | POST | `/api/alumnos` | Crear alumno (`nombre, apellido, dni, email, fechaPago, plan, medio`); registra el primer pago |
 | GET | `/api/alumnos/dni/:dni` | Buscar por DNI |
 | PUT | `/api/alumnos/:id` | Editar alumno (`plan` opcional; el vencimiento cambia solo si cambia la fecha de pago) |
-| DELETE | `/api/alumnos/:id` | Eliminar alumno (y su foto) — **solo administración** |
+| DELETE | `/api/alumnos/:id` | Eliminar alumno (y su foto y su ficha de salud) — **solo administración** |
 | POST | `/api/alumnos/:id/pago` | Registrar pago (`medio` obligatorio; `fechaPago` y `plan` opcionales: por defecto hoy y su plan) |
 | GET | `/api/alumnos/:id/pagos` | Historial de pagos del alumno (incluye los anulados) |
 | POST | `/api/pagos/:id/anular` | Anular el último pago del alumno (solo administración) |
 | GET / PUT / DELETE | `/api/alumnos/:id/foto` | Ver / subir (`imagen` en base64) / quitar foto |
-| GET | `/api/ingresos` | Lista de ingresos (más recientes primero) |
-| POST | `/api/ingresos` | Registrar ingreso (`dni`); devuelve también el alumno |
+| GET / PUT / DELETE | `/api/alumnos/:id/ficha` | Ver / subir (`archivo` en base64 + `fecha` del apto) / quitar la ficha de salud |
+| GET | `/api/ingresos` | Lista de asistencias (más recientes primero) |
+| POST | `/api/ingresos` | Registrar la asistencia (`dni`); devuelve también el alumno |
 | GET | `/api/planes` | Planes de cuota (cualquier rol) |
 | POST | `/api/planes` | Crear plan (`nombre, duracion: { cantidad, unidad }, precio, diasAviso`) — **solo administración** |
 | PUT | `/api/planes/:id` | Editar plan (mismos campos + `activo`) — **solo administración** |

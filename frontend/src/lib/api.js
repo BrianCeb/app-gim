@@ -50,6 +50,11 @@ export const api = {
     historialPagos: (id) => pedir(`/api/alumnos/${id}/pagos`),
     subirFoto: (id, imagen) => pedir(`/api/alumnos/${id}/foto`, { method: 'PUT', body: { imagen } }),
     eliminarFoto: (id) => pedir(`/api/alumnos/${id}/foto`, { method: 'DELETE' }),
+    // Ficha de salud (apto físico): el PDF o la foto en base64 y la fecha del certificado.
+    // Vale un año: el vencimiento lo calcula el servidor
+    subirFicha: (id, archivo, fecha, nombreArchivo) =>
+        pedir(`/api/alumnos/${id}/ficha`, { method: 'PUT', body: { archivo, fecha, nombreArchivo } }),
+    eliminarFicha: (id) => pedir(`/api/alumnos/${id}/ficha`, { method: 'DELETE' }),
 
     ingresos: () => pedir('/api/ingresos'),
     registrarIngreso: (dni) => pedir('/api/ingresos', { method: 'POST', body: { dni } }),

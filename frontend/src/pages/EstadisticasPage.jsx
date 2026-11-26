@@ -9,7 +9,7 @@ const DIAS_GRAFICO = 30;
 export default function EstadisticasPage() {
     const { alumnos, ingresos, cargando } = useDatos();
 
-    // Ingresos por día de los últimos 30 días (los días sin ingresos aparecen en 0)
+    // Asistencias por día de los últimos 30 días (los días sin nadie aparecen en 0)
     const porDia = useMemo(() => {
         const hoy = hoyISO();
         const conteo = new Map();
@@ -33,11 +33,11 @@ export default function EstadisticasPage() {
 
     return (
         <>
-            <Encabezado titulo="Estadísticas" descripcion="Se actualizan solas cuando hay ingresos o pagos nuevos." />
+            <Encabezado titulo="Estadísticas" descripcion="Se actualizan solas cuando hay asistencias o pagos nuevos." />
 
             <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <Tarjeta className="p-4">
-                    <p className="text-sm text-slate-500">Ingresos (30 días)</p>
+                    <p className="text-sm text-slate-500">Asistencias (30 días)</p>
                     <p className="mt-1 text-3xl font-bold tracking-tight">{totalMes}</p>
                 </Tarjeta>
                 <Tarjeta className="p-4">
@@ -52,14 +52,14 @@ export default function EstadisticasPage() {
 
             <div className="grid gap-6 lg:grid-cols-3">
                 <Tarjeta className="p-5 lg:col-span-2">
-                    <h2 className="mb-4 font-semibold text-slate-900">Ingresos por día · últimos 30 días</h2>
+                    <h2 className="mb-4 font-semibold text-slate-900">Asistencias por día · últimos 30 días</h2>
                     <div className="h-72">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={porDia} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
                                 <CartesianGrid vertical={false} stroke="#e2e8f0" />
                                 <XAxis dataKey="dia" tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={16} />
                                 <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} />
-                                <Tooltip cursor={{ fill: '#f1f5f9' }} formatter={(valor) => [valor, 'Ingresos']} />
+                                <Tooltip cursor={{ fill: '#f1f5f9' }} formatter={(valor) => [valor, 'Asistencias']} />
                                 <Bar dataKey="cantidad" fill="#0f172a" radius={[4, 4, 0, 0]} maxBarSize={28} />
                             </BarChart>
                         </ResponsiveContainer>

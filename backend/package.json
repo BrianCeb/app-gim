@@ -8,7 +8,8 @@
     "dev": "node --watch server.js",
     "seed:admin": "node scripts/crearAdmin.js",
     "migrar:ingresos": "node scripts/vincularIngresos.js",
-    "migrar:planes": "node scripts/migrarPlanes.js"
+    "migrar:planes": "node scripts/migrarPlanes.js",
+    "seed:demo": "node scripts/seedDemo.js"
   },
   "keywords": [],
   "author": "",
