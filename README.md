@@ -1,6 +1,6 @@
 # GimnasioApp
 
-App web para administrar el gimnasio: alumnos, cuotas, asistencias (por DNI o por nombre), fichas de salud y estadísticas.
+App web para administrar el gimnasio: alumnos, cuotas, asistencias (por DNI, por nombre o marcando la lista de la clase), clases, fichas de salud y estadísticas.
 
 - **Backend:** Node + Express 5 + MongoDB Atlas (Mongoose). Socket.io solo avisa cambios para que las pantallas abiertas se actualicen solas.
 - **Frontend:** React + Vite + Tailwind CSS 4.
@@ -18,11 +18,11 @@ gimnasio-app/
 │       ├── config/      # db.js, auth.js (JWT y cookie)
 │       ├── middlewares/ # auth.js: requireAuth, requireRol
 │       ├── dao/models/  # Alumno, Ingreso, Foto, Plan, Usuario
-│       ├── routes/      # auth, alumnos, ingresos, planes y usuarios (.router.js)
+│       ├── routes/      # auth, alumnos, ingresos, planes, clases y usuarios (.router.js)
 │       └── utils/       # vencimiento.js: cálculo del vencimiento según el plan
 ├── frontend/           # React
 │   └── src/
-│       ├── pages/       # Inicio, Panel, Asistencia, Alumnos, Pagos, Estadísticas, Planes, Personal
+│       ├── pages/       # Inicio, Panel, Asistencia, Alumnos, Pagos, Estadísticas, Planes, Clases, Personal
 │       ├── components/  # Layout, RutaProtegida, formularios, ui
 │       ├── context/     # sesión (AuthContext), datos compartidos y avisos
 │       ├── hooks/       # useAuth
@@ -62,6 +62,8 @@ La app abre en el **Inicio** (`/ingresar`): ingresá con el email y la contrase�
 - Las fotos se achican en el navegador (máx. 400 px) y se guardan en MongoDB, en la colección `fotos`.
 - Cada asistencia guarda el `_id` del alumno (y el DNI de ese día): corregir el DNI de un alumno no le hace perder sus asistencias.
 - La ficha de salud (apto físico) es un PDF o una foto de hasta 4 MB, guardada en la colección `fichasaluds`. Es opcional al dar de alta; vale un año desde la fecha del certificado, y el Panel y Alumnos avisan a quién le falta o se le venció.
+- Una **clase** es un turno fijo (nombre, días y horario). Cada alumno puede anotarse en una y, en Asistencia, se lo marca con un clic en la lista de la clase que está pasando.
+- Un **plan** puede cubrir 1, 2, 3… clases por semana o ser libre: si el alumno se pasa, se avisa al registrarlo, pero no se lo bloquea.
 - Para la demo: `npm run seed:demo --prefix backend -- --aplicar` carga 20 alumnos ficticios (DNI `99xxxxxx`) con asistencias, pagos y fichas; `-- --borrar --aplicar` los saca.
 
 ## Roles
@@ -73,7 +75,7 @@ La app abre en el **Inicio** (`/ingresar`): ingresá con el email y la contrase�
 | Ver el historial de pagos | ✔ | ✔ |
 | Anular el último pago de un alumno | — | ✔ |
 | Elegir el plan de un alumno y ver los precios | ✔ | ✔ |
-| Ajustes → Planes: crear, editar, activar/desactivar planes | — | ✔ |
+| Ajustes → Planes y Clases: crear, editar, activar/desactivar | — | ✔ |
 | Eliminar alumnos | — | ✔ |
 | Estadísticas | — | ✔ |
 | Ajustes → Personal: crear, editar, activar/desactivar cuentas y cambiar contraseñas | — | ✔ |
@@ -102,8 +104,12 @@ Todas las rutas `/api` piden sesión, salvo login y logout. Sin sesión → **40
 | GET / PUT / DELETE | `/api/alumnos/:id/ficha` | Ver / subir (`archivo` en base64 + `fecha` del apto) / quitar la ficha de salud |
 | GET | `/api/ingresos` | Lista de asistencias (más recientes primero) |
 | POST | `/api/ingresos` | Registrar la asistencia (`dni`); devuelve también el alumno |
+| GET | `/api/clases` | Clases o turnos (cualquier rol) |
+| POST | `/api/clases` | Crear clase (`nombre, dias, horaInicio, horaFin`) — **solo administración** |
+| PUT | `/api/clases/:id` | Editar clase (mismos campos + `activa`) — **solo administración** |
+| GET | `/api/clases/:id/alumnos` | Alumnos anotados en una clase |
 | GET | `/api/planes` | Planes de cuota (cualquier rol) |
-| POST | `/api/planes` | Crear plan (`nombre, duracion: { cantidad, unidad }, precio, diasAviso`) — **solo administración** |
+| POST | `/api/planes` | Crear plan (`nombre, duracion: { cantidad, unidad }, precio, diasAviso, clasesPorSemana`) — **solo administración** |
 | PUT | `/api/planes/:id` | Editar plan (mismos campos + `activo`) — **solo administración** |
 | GET | `/api/usuarios` | Cuentas del personal — **solo administración** (igual que las tres siguientes) |
 | POST | `/api/usuarios` | Crear cuenta (`nombre, email, rol, password`) |

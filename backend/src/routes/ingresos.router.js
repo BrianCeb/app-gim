@@ -13,7 +13,7 @@ router.post('/', async (req, res) => {
         }
 
         // Con el plan completo: la pantalla de ingreso calcula el estado de pago con sus días de aviso
-        const alumno = await Alumno.findOne({ dni }).populate('plan', 'nombre duracion precio diasAviso activo');
+        const alumno = await Alumno.findOne({ dni }).populate('plan', 'nombre duracion precio diasAviso clasesPorSemana activo');
 
         if (!alumno) {
             return res.status(404).json({ error: 'Alumno no encontrado' });

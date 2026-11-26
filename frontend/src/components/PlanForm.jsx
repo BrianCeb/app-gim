@@ -18,7 +18,9 @@ export default function PlanForm({ plan, onGuardado, onCancelar }) {
         cantidad: String(plan?.duracion.cantidad ?? 1),
         unidad: plan?.duracion.unidad ?? 'meses',
         precio: plan ? String(plan.precio) : '',
-        diasAviso: String(plan?.diasAviso ?? avisoSugerido('meses'))
+        diasAviso: String(plan?.diasAviso ?? avisoSugerido('meses')),
+        // Vacío = plan libre (sin límite de clases por semana)
+        clasesPorSemana: plan?.clasesPorSemana ? String(plan.clasesPorSemana) : ''
     });
     // Mientras no se toquen los días de aviso, siguen la sugerencia de la unidad (3 meses / 1 días)
     const [avisoTocado, setAvisoTocado] = useState(!esNuevo);
@@ -51,7 +53,8 @@ export default function PlanForm({ plan, onGuardado, onCancelar }) {
             nombre: datos.nombre.trim(),
             duracion: { cantidad: Number(datos.cantidad), unidad: datos.unidad },
             precio: Number(datos.precio),
-            diasAviso: Number(datos.diasAviso)
+            diasAviso: Number(datos.diasAviso),
+            clasesPorSemana: datos.clasesPorSemana.trim() === '' ? null : Number(datos.clasesPorSemana)
         };
         try {
             const guardado = esNuevo ? await api.crearPlan(cuerpo) : await api.editarPlan(plan._id, { ...cuerpo, activo: plan.activo });
@@ -106,6 +109,19 @@ export default function PlanForm({ plan, onGuardado, onCancelar }) {
                 </Campo>
                 <Campo etiqueta="Aviso de vencimiento" error={errores.diasAviso} ayuda="Días antes del vencimiento en que el alumno aparece “Por vencer”.">
                     <input value={datos.diasAviso} onChange={cambiar('diasAviso')} inputMode="numeric" className={claseInput(errores.diasAviso)} />
+                </Campo>
+                <Campo
+                    etiqueta="Clases por semana"
+                    error={errores.clasesPorSemana}
+                    ayuda="Dejalo vacío si el plan es libre. No bloquea la entrada: solo avisa si el alumno ya vino esas veces."
+                >
+                    <input
+                        value={datos.clasesPorSemana}
+                        onChange={cambiar('clasesPorSemana')}
+                        inputMode="numeric"
+                        placeholder="Libre"
+                        className={claseInput(errores.clasesPorSemana)}
+                    />
                 </Campo>
             </div>
 

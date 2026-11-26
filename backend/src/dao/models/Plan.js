@@ -18,6 +18,9 @@ const planSchema = new mongoose.Schema(
         precio: { type: Number, required: true, min: 0 },
         // Cuántos días antes del vencimiento el alumno aparece "por vencer"
         diasAviso: { type: Number, default: DIAS_AVISO_DEFECTO, min: 0 },
+        // Cuántas clases por semana cubre el plan (1, 2, 3…). null = libre, sin límite.
+        // No bloquea nada: si el alumno viene más veces, al registrar la asistencia se avisa
+        clasesPorSemana: { type: Number, default: null, min: 1, max: 7 },
         // Los planes no se borran: se desactivan, para no perder a qué plan pertenecía cada alumno
         activo: { type: Boolean, default: true }
     },

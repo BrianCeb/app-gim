@@ -19,6 +19,8 @@ const PERMISOS = {
     personal: [ROLES.ADMINISTRACION],
     // Crear y editar planes de cuota (verlos y elegirlos lo hacen todos)
     planes: [ROLES.ADMINISTRACION],
+    // Crear y editar clases o turnos (verlas y pasar asistencia lo hacen todos)
+    clases: [ROLES.ADMINISTRACION],
     // Anular un pago (HU 12): ver el historial lo hacen todos
     anularPago: [ROLES.ADMINISTRACION]
 };

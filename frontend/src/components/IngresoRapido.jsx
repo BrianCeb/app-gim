@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { CircleX, LogIn, Search } from 'lucide-react';
 import { api } from '../lib/api';
-import { ESTADOS, estadoPago, formatearFecha, formatearHora, textoVencimiento } from '../lib/fechas';
+import { ESTADOS, diaArgentinoISO, estadoPago, formatearFecha, formatearHora, lunesDeLaSemana, textoVencimiento } from '../lib/fechas';
 import { nombreCompleto } from '../lib/alumnos';
 import { estadoFicha, textoFicha } from '../lib/fichaSalud';
 import { useDatos } from '../context/DatosContext';
@@ -14,7 +14,7 @@ const BORDES = { alDia: 'ring-emerald-300 bg-emerald-50/60', porVencer: 'ring-am
 // si la cuota está al día. Con el DNI completo alcanza con apretar Enter (es único); con un
 // nombre aparecen las coincidencias y se elige una.
 export default function IngresoRapido() {
-    const { recargarIngresos } = useDatos();
+    const { ingresos, recargarIngresos } = useDatos();
     const input = useRef(null);
     const [busqueda, setBusqueda] = useState('');
     const [enviando, setEnviando] = useState(false);
@@ -28,11 +28,28 @@ export default function IngresoRapido() {
     // La única excepción es el DNI exacto, donde no hay nada que elegir y Enter ya registra.
     const mostrarSugerencias = !exacto && sugerencias.length > 0;
 
+    // Cuántas clases hizo esta semana, contando la que se acaba de registrar. La lista del contexto
+    // puede no tener todavía la nueva (se recarga aparte), así que se la suma a mano
+    const clasesDeLaSemana = (alumno, nuevoId) => {
+        const lunes = lunesDeLaSemana();
+        const previas = ingresos.filter(
+            (i) => i._id !== nuevoId && i.alumno === alumno._id && diaArgentinoISO(i.fecha) >= lunes
+        );
+        return previas.length + 1;
+    };
+
     const registrar = async (alumno) => {
         setEnviando(true);
         try {
             const ingreso = await api.registrarIngreso(alumno.dni);
-            setResultado({ alumno: ingreso.alumno, hora: ingreso.fecha });
+            // El plan puede cubrir una cantidad de clases por semana: si se pasa, se avisa (no se bloquea)
+            const hechas = clasesDeLaSemana(ingreso.alumno, ingreso._id);
+            const cubre = ingreso.alumno.plan?.clasesPorSemana ?? null;
+            setResultado({
+                alumno: ingreso.alumno,
+                hora: ingreso.fecha,
+                exceso: cubre && hechas > cubre ? { hechas, cubre } : null
+            });
             setBusqueda('');
             recargarIngresos().catch(() => {});
         } catch (err) {
@@ -149,6 +166,12 @@ export default function IngresoRapido() {
                         </p>
                         {/* La ficha de salud se avisa acá porque es el momento en que el alumno está en el mostrador */}
                         {ficha.clave !== 'alDia' && <p className="mt-1 text-sm font-semibold text-amber-800">⚠ {textoFicha(ficha)}</p>}
+                        {/* El plan cubre tantas clases por semana: pasarse no bloquea la entrada, solo se avisa */}
+                        {resultado.exceso && (
+                            <p className="mt-1 text-sm font-semibold text-amber-800">
+                                ⚠ Va {resultado.exceso.hechas} clases esta semana y el plan cubre {resultado.exceso.cubre}.
+                            </p>
+                        )}
                     </div>
                 </div>
             )}

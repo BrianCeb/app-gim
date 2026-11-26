@@ -34,6 +34,13 @@ export function sumarDias(iso, dias) {
     return fecha.toISOString().slice(0, 10);
 }
 
+// Lunes de la semana (argentina) a la que pertenece un día "YYYY-MM-DD".
+// Se usa para contar cuántas clases hizo el alumno en la semana que paga su plan
+export function lunesDeLaSemana(iso = hoyISO()) {
+    const dia = new Date(`${iso}T00:00:00Z`).getUTCDay(); // 0 = domingo
+    return sumarDias(iso, dia === 0 ? -6 : 1 - dia);
+}
+
 // Mismo cálculo que backend/src/utils/vencimiento.js, para mostrar el vencimiento antes de guardar.
 // Trabaja con textos "YYYY-MM-DD". "meses" = mes calendario (31/1 + 1 mes → 28/2); "dias" = días fijos
 export function sumarDuracion(iso, { cantidad, unidad }) {

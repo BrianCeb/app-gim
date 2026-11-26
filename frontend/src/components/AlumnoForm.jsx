@@ -2,7 +2,8 @@ import { useRef, useState } from 'react';
 import { Camera, CircleAlert, FileText, Paperclip, Trash2 } from 'lucide-react';
 import { api } from '../lib/api';
 import { fechaAISO, formatearFecha, hoyISO, sumarDuracion } from '../lib/fechas';
-import { formatearPrecio, textoDuracion, textoPlan } from '../lib/planes';
+import { formatearPrecio, textoClases, textoDuracion, textoPlan } from '../lib/planes';
+import { textoDias, textoHorario } from '../lib/clases';
 import { validarMedio } from '../lib/pagos';
 import { achicarImagen } from '../lib/imagen';
 import { leerFichaSalud } from '../lib/archivo';
@@ -14,7 +15,7 @@ import SelectorMedio from './SelectorMedio';
 
 // Formulario para crear (alumno = null) o editar un alumno, incluida su foto
 export default function AlumnoForm({ alumno, onTerminar }) {
-    const { recargarAlumnos, planesActivos } = useDatos();
+    const { recargarAlumnos, planesActivos, clases, clasesActivas } = useDatos();
     const avisar = useAvisos();
     const inputFoto = useRef(null);
     const inputFicha = useRef(null);
@@ -26,7 +27,9 @@ export default function AlumnoForm({ alumno, onTerminar }) {
         email: alumno?.email ?? '',
         fechaPago: alumno ? fechaAISO(alumno.fechaPago) : hoyISO(),
         // Alta: si hay un solo plan, ya viene elegido. Edición: el plan que tiene el alumno
-        plan: alumno?.plan?._id ?? (planesActivos.length === 1 ? planesActivos[0]._id : '')
+        plan: alumno?.plan?._id ?? (planesActivos.length === 1 ? planesActivos[0]._id : ''),
+        // Clase (turno) opcional: '' = viene libremente, sin turno fijo
+        clase: alumno?.clase ?? ''
     });
     // Solo en el alta: el alta es el primer pago y queda en el historial con su medio (HU 12).
     // Al editar no se pide: editar no es cobrar
@@ -46,6 +49,16 @@ export default function AlumnoForm({ alumno, onTerminar }) {
     const planActualInactivo = alumno?.plan && !alumno.plan.activo ? alumno.plan : null;
     const opcionesPlan = planActualInactivo ? [...planesActivos, planActualInactivo] : planesActivos;
     const planElegido = opcionesPlan.find((p) => p._id === datos.plan);
+
+    // Lo mismo con las clases: si el alumno está en una que se desactivó, se la sigue ofreciendo
+    const claseActualInactiva = clases.find((c) => c._id === alumno?.clase && !c.activa);
+    const opcionesClase = claseActualInactiva ? [...clasesActivas, claseActualInactiva] : clasesActivas;
+    const claseElegida = opcionesClase.find((c) => c._id === datos.clase);
+    // Aviso (no bloquea): la clase tiene más días por semana que los que cubre el plan
+    const avisoClases =
+        claseElegida && planElegido?.clasesPorSemana && claseElegida.dias.length > planElegido.clasesPorSemana
+            ? `La clase viene ${claseElegida.dias.length} días por semana y el plan cubre ${planElegido.clasesPorSemana}.`
+            : null;
 
     const vistaPrevia = foto?.dataUrl ?? (foto?.quitar ? null : alumno?.fotoUrl || null);
     // Ficha que el alumno ya tiene guardada (null en el alta o si nunca entregó el apto)
@@ -95,7 +108,8 @@ export default function AlumnoForm({ alumno, onTerminar }) {
         if (Object.keys(nuevosErrores).length > 0) return;
 
         setGuardando(true);
-        const cuerpo = { ...datos, dni: normalizarDni(datos.dni), ...(alumno ? {} : { medio }) };
+        // clase vacía viaja como null: el backend lo entiende como "sin turno fijo"
+        const cuerpo = { ...datos, dni: normalizarDni(datos.dni), clase: datos.clase || null, ...(alumno ? {} : { medio }) };
         let guardado;
         try {
             guardado = alumno ? await api.editarAlumno(alumno._id, cuerpo) : await api.crearAlumno(cuerpo);
@@ -198,6 +212,27 @@ export default function AlumnoForm({ alumno, onTerminar }) {
                 <Campo etiqueta="Fecha de pago" error={errores.fechaPago} ayuda={textoVence(alumno, datos, planElegido)}>
                     <input type="date" value={datos.fechaPago} onChange={cambiar('fechaPago')} className={claseInput(errores.fechaPago)} />
                 </Campo>
+                <div className="sm:col-span-2">
+                    <Campo
+                        etiqueta="Clase"
+                        ayuda={
+                            avisoClases ??
+                            (claseElegida
+                                ? `${textoDias(claseElegida.dias)} de ${textoHorario(claseElegida)}. En Asistencia se la marca con un clic.`
+                                : 'Opcional: si viene siempre al mismo turno, elegilo y aparece en la lista de esa clase.')
+                        }
+                    >
+                        <select value={datos.clase} onChange={cambiar('clase')} className={claseInput(false)}>
+                            <option value="">Sin clase fija</option>
+                            {opcionesClase.map((c) => (
+                                <option key={c._id} value={c._id}>
+                                    {c.nombre} · {textoDias(c.dias)} {textoHorario(c)}
+                                    {c.activa ? '' : ' (ya no se dicta)'}
+                                </option>
+                            ))}
+                        </select>
+                    </Campo>
+                </div>
             </div>
 
             {/* Ficha de salud: es opcional para poder guardar (en el mostrador no siempre la traen),
@@ -292,7 +327,8 @@ export default function AlumnoForm({ alumno, onTerminar }) {
                     />
                     {planElegido && (
                         <p className="text-sm text-slate-500">
-                            Primer pago: <strong className="font-semibold text-slate-900">{formatearPrecio(planElegido.precio)}</strong>. Queda en el historial de pagos.
+                            Primer pago: <strong className="font-semibold text-slate-900">{formatearPrecio(planElegido.precio)}</strong> ·{' '}
+                            {textoClases(planElegido.clasesPorSemana)}. Queda en el historial de pagos.
                         </p>
                     )}
                 </div>

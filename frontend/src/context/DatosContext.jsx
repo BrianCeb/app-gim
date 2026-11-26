@@ -10,6 +10,7 @@ export function DatosProvider({ children }) {
     const [alumnos, setAlumnos] = useState([]);
     const [ingresos, setIngresos] = useState([]);
     const [planes, setPlanes] = useState([]);
+    const [clases, setClases] = useState([]);
     const [cargando, setCargando] = useState(true);
     const [error, setError] = useState(null);
 
@@ -25,16 +26,20 @@ export function DatosProvider({ children }) {
         setPlanes(await api.planes());
     }, []);
 
+    const recargarClases = useCallback(async () => {
+        setClases(await api.clases());
+    }, []);
+
     const recargarTodo = useCallback(async () => {
         setError(null);
         try {
-            await Promise.all([recargarAlumnos(), recargarIngresos(), recargarPlanes()]);
+            await Promise.all([recargarAlumnos(), recargarIngresos(), recargarPlanes(), recargarClases()]);
         } catch (err) {
             setError(err.message);
         } finally {
             setCargando(false);
         }
-    }, [recargarAlumnos, recargarIngresos, recargarPlanes]);
+    }, [recargarAlumnos, recargarIngresos, recargarPlanes, recargarClases]);
 
     useEffect(() => {
         recargarTodo();
@@ -43,6 +48,11 @@ export function DatosProvider({ children }) {
         socket.on('alumnos:cambio', () => recargarAlumnos().catch(() => {}));
         socket.on('ingresos:cambio', () => recargarIngresos().catch(() => {}));
         // Si cambia un plan (precio, días de aviso) también cambian los datos que trae cada alumno
+        socket.on('clases:cambio', () => {
+            recargarClases().catch(() => {});
+            // Si una clase se desactiva, cambia lo que se puede elegir en la ficha del alumno
+            recargarAlumnos().catch(() => {});
+        });
         socket.on('planes:cambio', () => {
             recargarPlanes().catch(() => {});
             recargarAlumnos().catch(() => {});
@@ -57,7 +67,7 @@ export function DatosProvider({ children }) {
         });
 
         return () => socket.disconnect();
-    }, [recargarTodo, recargarAlumnos, recargarIngresos, recargarPlanes]);
+    }, [recargarTodo, recargarAlumnos, recargarIngresos, recargarPlanes, recargarClases]);
 
     // Alumnos por _id, para encontrar en un paso el alumno de cada ingreso (ingreso.alumno es su _id).
     // useMemo: el Map se arma de nuevo solo cuando cambia la lista de alumnos
@@ -66,17 +76,25 @@ export function DatosProvider({ children }) {
     // Solo los planes que se pueden elegir hoy (para los formularios de alta y de pago)
     const planesActivos = useMemo(() => planes.filter((p) => p.activo), [planes]);
 
+    // Clases activas y un índice por _id: el alumno guarda solo el id de su clase
+    const clasesActivas = useMemo(() => clases.filter((c) => c.activa), [clases]);
+    const clasesPorId = useMemo(() => new Map(clases.map((c) => [c._id, c])), [clases]);
+
     const valor = {
         alumnos,
         ingresos,
         alumnosPorId,
         planes,
         planesActivos,
+        clases,
+        clasesActivas,
+        clasesPorId,
         cargando,
         error,
         recargarAlumnos,
         recargarIngresos,
         recargarPlanes,
+        recargarClases,
         recargarTodo
     };
 

@@ -5,6 +5,7 @@ import { NavLink } from 'react-router-dom';
 // Se agrupan en un solo ítem del menú para que la barra inferior del celular no pase de 6 ítems.
 const PESTANAS = [
     { a: '/planes', etiqueta: 'Planes' },
+    { a: '/clases', etiqueta: 'Clases' },
     { a: '/personal', etiqueta: 'Personal' }
 ];
 

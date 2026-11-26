@@ -14,6 +14,10 @@ export function textoDuracion({ cantidad, unidad }) {
 // "Mensual · $ 25.000" (para las opciones de los selectores)
 export const textoPlan = (plan) => `${plan.nombre} · ${formatearPrecio(plan.precio)}`;
 
+// "3 clases por semana" o "Clases libres" si el plan no tiene límite
+export const textoClases = (clasesPorSemana) =>
+    clasesPorSemana ? `${clasesPorSemana} ${clasesPorSemana === 1 ? 'clase' : 'clases'} por semana` : 'Clases libres';
+
 // Aviso "por vencer" sugerido: 3 días para planes de meses, 1 para planes de días
 export const avisoSugerido = (unidad) => (unidad === 'dias' ? 1 : 3);
 
@@ -25,6 +29,12 @@ export function validarPlan(datos) {
     if (!datos.nombre.trim()) errores.nombre = 'Ingresá el nombre del plan.';
     if (!esEnteroDesde(datos.cantidad, 1)) errores.cantidad = 'Número entero, 1 o más.';
     if (!esEnteroDesde(datos.precio, 0)) errores.precio = 'Precio en pesos, sin puntos ni centavos.';
+    // Clases por semana es opcional: vacío = plan libre
+    if (String(datos.clasesPorSemana ?? '').trim() !== '') {
+        if (!esEnteroDesde(datos.clasesPorSemana, 1) || Number(datos.clasesPorSemana) > 7) {
+            errores.clasesPorSemana = 'Número entero de 1 a 7, o vacío si es libre.';
+        }
+    }
     if (!esEnteroDesde(datos.diasAviso, 0)) errores.diasAviso = 'Número entero, 0 o más.';
     else if (datos.unidad === 'dias' && Number(datos.diasAviso) >= Number(datos.cantidad)) {
         errores.diasAviso = 'Tiene que ser menos que la duración del plan.';

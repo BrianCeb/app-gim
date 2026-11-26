@@ -4,6 +4,7 @@ import Alumno from '../dao/models/Alumno.js';
 import Foto from '../dao/models/Foto.js';
 import FichaSalud from '../dao/models/FichaSalud.js';
 import Plan from '../dao/models/Plan.js';
+import Clase from '../dao/models/Clase.js';
 import Pago, { MEDIOS_PAGO } from '../dao/models/Pago.js';
 import { calcularVencimiento, sumarDuracion } from '../utils/vencimiento.js';
 import { requireRol } from '../middlewares/auth.js';
@@ -35,7 +36,7 @@ function parsearFecha(valor) {
 }
 
 // Campos del plan que viajan junto con cada alumno (para mostrar nombre, precio y estado de pago)
-const CAMPOS_PLAN = 'nombre duracion precio diasAviso activo';
+const CAMPOS_PLAN = 'nombre duracion precio diasAviso clasesPorSemana activo';
 
 // Completa el plan del alumno (o de una lista de alumnos) con sus datos, en lugar de solo el _id
 function conPlan(consulta) {
@@ -53,6 +54,19 @@ async function buscarPlan(planId, planActualId = null) {
         return { error: `El plan "${plan.nombre}" ya no está activo. Elegí otro.` };
     }
     return { plan };
+}
+
+// Busca la clase (turno) elegida. Devuelve { clase } (null si el alumno no va a ninguna) o { error }.
+// Una clase desactivada solo se acepta si es la que el alumno ya tenía
+async function buscarClase(claseId, claseActualId = null) {
+    if (!claseId) return { clase: null };
+    const clase = mongoose.isValidObjectId(claseId) ? await Clase.findById(claseId) : null;
+    if (!clase) return { error: 'La clase elegida no existe.' };
+    const esLaActual = claseActualId && String(claseActualId) === String(clase._id);
+    if (!clase.activa && !esLaActual) {
+        return { error: `La clase "${clase.nombre}" ya no se dicta. Elegí otra.` };
+    }
+    return { clase };
 }
 
 // Fecha de hoy en Argentina, a medianoche UTC (mismo formato en que se guardan las fechas de pago)
@@ -178,10 +192,15 @@ router.post('/', async (req, res) => {
         const errorMedio = validarMedio(req.body.medio);
         if (errorMedio) return res.status(400).json({ error: errorMedio });
 
+        // La clase (turno) es opcional: hay alumnos que vienen libremente
+        const { clase, error: errorClase } = await buscarClase(req.body.clase);
+        if (errorClase) return res.status(400).json({ error: errorClase });
+
         // Alta: no hay vencimiento anterior, el período cuenta desde la fecha de pago
         const nuevoAlumno = new Alumno({
             ...datos,
             plan: plan._id,
+            clase: clase?._id ?? null,
             fechaVencimiento: calcularVencimiento({ fechaPago: datos.fechaPago, duracion: plan.duracion })
         });
 
@@ -269,8 +288,13 @@ router.put('/:id', async (req, res) => {
         const { plan, error: errorPlan } = await buscarPlan(req.body.plan ?? alumno.plan, alumno.plan);
         if (errorPlan) return res.status(400).json({ error: errorPlan });
 
+        // Si no se envía el campo, queda la clase que tenía; enviarlo vacío la saca
+        const claseEnviada = Object.hasOwn(req.body, 'clase') ? req.body.clase : alumno.clase;
+        const { clase, error: errorClase } = await buscarClase(claseEnviada, alumno.clase);
+        if (errorClase) return res.status(400).json({ error: errorClase });
+
         const cambioFechaPago = datos.fechaPago.getTime() !== alumno.fechaPago.getTime();
-        Object.assign(alumno, datos, { plan: plan._id });
+        Object.assign(alumno, datos, { plan: plan._id, clase: clase?._id ?? null });
         if (cambioFechaPago) {
             alumno.fechaVencimiento = sumarDuracion(datos.fechaPago, plan.duracion);
         }

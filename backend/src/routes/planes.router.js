@@ -54,7 +54,14 @@ function validarDatos(body) {
         return { error: 'Los días de aviso tienen que ser menos que la duración del plan.' };
     }
 
-    return { datos: { nombre, duracion: { cantidad, unidad }, precio, diasAviso } };
+    // Clases por semana: opcional. Vacío = plan libre (sin límite de clases)
+    const sinClases = body?.clasesPorSemana === undefined || body?.clasesPorSemana === '' || body?.clasesPorSemana === null;
+    const clasesPorSemana = sinClases ? null : Number(body.clasesPorSemana);
+    if (!sinClases && (!esEnteroDesde(clasesPorSemana, 1) || clasesPorSemana > 7)) {
+        return { error: 'Las clases por semana tienen que ser un número entero de 1 a 7, o quedar vacías.' };
+    }
+
+    return { datos: { nombre, duracion: { cantidad, unidad }, precio, diasAviso, clasesPorSemana } };
 }
 
 function responderError(res, error, mensaje) {

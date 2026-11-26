@@ -13,6 +13,7 @@ import IngresosPage from './pages/IngresosPage';
 import PagosPage from './pages/PagosPage';
 import PersonalPage from './pages/PersonalPage';
 import PlanesPage from './pages/PlanesPage';
+import ClasesPage from './pages/ClasesPage';
 import { Cargando, EstadoVacio } from './components/ui';
 import './index.css';
 
@@ -65,12 +66,20 @@ createRoot(document.getElementById('root')).render(
                                     </RutaProtegida>
                                 }
                             />
-                            {/* Ajustes: dos pestañas, cada una con su ruta */}
+                            {/* Ajustes: tres pestañas, cada una con su ruta */}
                             <Route
                                 path="/planes"
                                 element={
                                     <RutaProtegida permiso="planes">
                                         <PlanesPage />
+                                    </RutaProtegida>
+                                }
+                            />
+                            <Route
+                                path="/clases"
+                                element={
+                                    <RutaProtegida permiso="clases">
+                                        <ClasesPage />
                                     </RutaProtegida>
                                 }
                             />
