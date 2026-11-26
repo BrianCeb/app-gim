@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Pencil, Search, Trash2, UserPlus, Users, Wallet } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { FileText, Pencil, Search, Trash2, UserPlus, Users, Wallet } from 'lucide-react';
 import { useDatos } from '../context/DatosContext';
 import { useAvisos } from '../context/AvisosContext';
 import { useAuth } from '../hooks/useAuth';
@@ -8,10 +9,23 @@ import { puede } from '../lib/permisos';
 import { useFiltroEstado } from '../hooks/useFiltroEstado';
 import { formatearFecha } from '../lib/fechas';
 import { nombreCompleto, normalizarDni, textoBuscable } from '../lib/alumnos';
+import { fichaARevisar } from '../lib/fichaSalud';
 import AlumnoForm from '../components/AlumnoForm';
 import RegistrarPago from '../components/RegistrarPago';
 import { Confirmacion, Modal } from '../components/Modal';
-import { Avatar, Boton, BotonIcono, Cargando, Encabezado, EstadoBadge, EstadoVacio, FiltrosEstado, Tarjeta, claseInput } from '../components/ui';
+import {
+    Avatar,
+    Boton,
+    BotonIcono,
+    Cargando,
+    Encabezado,
+    EstadoBadge,
+    EstadoVacio,
+    FichaBadge,
+    FiltrosEstado,
+    Tarjeta,
+    claseInput
+} from '../components/ui';
 
 export default function AlumnosPage() {
     const { alumnos, cargando, recargarAlumnos } = useDatos();
@@ -30,15 +44,23 @@ export default function AlumnosPage() {
     // Custom hook: el mismo filtro por estado que Pagos (acá el filtro vive solo en memoria)
     const { filtrados, conteos, filtro, cambiarFiltro } = useFiltroEstado(alumnos);
 
+    // Filtro de ficha de salud. Va en la dirección (?ficha=pendiente) para que el Panel pueda
+    // llevar directo al listado de los que no entregaron el apto o lo tienen vencido
+    const [parametros, setParametros] = useSearchParams();
+    const soloFicha = parametros.get('ficha') === 'pendiente';
+    const alternarFicha = () => setParametros(soloFicha ? {} : { ficha: 'pendiente' }, { replace: true });
+    const conteoFicha = useMemo(() => alumnos.filter(fichaARevisar).length, [alumnos]);
+
     // Sobre lo filtrado por estado, busca por nombre, apellido o DNI (con o sin puntos)
     const visibles = useMemo(() => {
         const texto = textoBuscable(busqueda.trim());
         const dni = normalizarDni(busqueda);
-        if (!texto) return filtrados;
-        return filtrados.filter(
+        const porFicha = soloFicha ? filtrados.filter(({ alumno }) => fichaARevisar(alumno)) : filtrados;
+        if (!texto) return porFicha;
+        return porFicha.filter(
             ({ alumno }) => textoBuscable(nombreCompleto(alumno)).includes(texto) || (dni && alumno.dni.includes(dni))
         );
-    }, [filtrados, busqueda]);
+    }, [filtrados, busqueda, soloFicha]);
 
     const confirmarEliminar = async () => {
         setBorrando(true);
@@ -90,7 +112,21 @@ export default function AlumnosPage() {
                         className={`${claseInput(false)} pl-9`}
                     />
                 </div>
-                <FiltrosEstado valor={filtro} onCambio={cambiarFiltro} conteos={conteos} />
+                <div className="flex flex-wrap items-center gap-2">
+                    <FiltrosEstado valor={filtro} onCambio={cambiarFiltro} conteos={conteos} />
+                    {/* Filtro aparte del estado de la cuota: se puede estar al día con el pago y sin apto físico */}
+                    <button
+                        onClick={alternarFicha}
+                        aria-pressed={soloFicha}
+                        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
+                            soloFicha ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100'
+                        }`}
+                    >
+                        <FileText className="size-4" aria-hidden />
+                        Ficha a revisar
+                        <span className={soloFicha ? 'text-slate-300' : 'text-slate-500'}>{conteoFicha}</span>
+                    </button>
+                </div>
             </div>
 
             <Tarjeta className="overflow-hidden">
@@ -138,7 +174,10 @@ export default function AlumnosPage() {
                                         <td className="px-3 py-3 text-slate-600 tabular-nums">{formatearFecha(alumno.fechaPago)}</td>
                                         <td className="px-3 py-3 text-slate-600 tabular-nums">{formatearFecha(alumno.fechaVencimiento)}</td>
                                         <td className="px-3 py-3">
-                                            <EstadoBadge alumno={alumno} />
+                                            <div className="flex flex-col items-start gap-1">
+                                                <EstadoBadge alumno={alumno} />
+                                                <FichaBadge alumno={alumno} />
+                                            </div>
                                         </td>
                                         <td className="px-5 py-3">{acciones(alumno)}</td>
                                     </tr>
@@ -159,7 +198,10 @@ export default function AlumnosPage() {
                                                 {alumno.plan && ` · ${alumno.plan.nombre}`}
                                             </p>
                                         </div>
-                                        <EstadoBadge alumno={alumno} />
+                                        <div className="flex shrink-0 flex-col items-end gap-1">
+                                            <EstadoBadge alumno={alumno} />
+                                            <FichaBadge alumno={alumno} />
+                                        </div>
                                     </div>
                                     <div className="mt-3 flex items-center justify-between">
                                         <p className="text-sm text-slate-500">
