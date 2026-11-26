@@ -9,11 +9,16 @@ import IngresoRapido from '../components/IngresoRapido';
 import RegistrarPago from '../components/RegistrarPago';
 import { Avatar, Boton, Cargando, EstadoBadge, EstadoVacio, Tarjeta } from '../components/ui';
 
-function Indicador({ titulo, valor, a, acento = 'text-slate-900', className = '' }) {
+// ancho: el bloque que en celular ocupa las dos columnas. Ahí el número va al lado del texto
+// (una sola línea, en vez de dos) para que abajo siga entrando "Cuotas a revisar".
+// Desde 640 px vuelve a ser igual a los demás.
+function Indicador({ titulo, valor, a, acento = 'text-slate-900', ancho = false, className = '' }) {
     return (
         <Link to={a} className={`rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-900/5 transition hover:ring-slate-900/15 ${className}`}>
-            <p className="text-sm text-slate-500">{titulo}</p>
-            <p className={`mt-1 text-3xl font-bold tracking-tight ${acento}`}>{valor}</p>
+            <div className={ancho ? 'flex items-center justify-between gap-3 sm:block' : ''}>
+                <p className="text-sm text-slate-500">{titulo}</p>
+                <p className={`text-3xl font-bold tracking-tight ${acento} ${ancho ? 'sm:mt-1' : 'mt-1'}`}>{valor}</p>
+            </div>
         </Link>
     );
 }
@@ -61,6 +66,7 @@ export default function PanelPage() {
                             valor={resumen.fichaARevisar}
                             a="/alumnos?ficha=pendiente"
                             acento={resumen.fichaARevisar > 0 ? 'text-amber-600' : 'text-slate-900'}
+                            ancho
                             className="max-sm:col-span-2"
                         />
                     </div>
