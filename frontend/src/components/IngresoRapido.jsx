@@ -23,9 +23,10 @@ export default function IngresoRapido() {
     // Custom hook: busca sobre los alumnos ya cargados, sin consultar al servidor en cada tecla
     const { sugerencias, exacto, total } = useBuscarAlumno(busqueda);
 
-    // Se muestran las sugerencias mientras se escribe, salvo cuando el DNI ya es exacto
-    // (ahí no hay nada que elegir) o cuando hay una sola coincidencia, que Enter ya resuelve
-    const mostrarSugerencias = !exacto && sugerencias.length > 1;
+    // Se muestran las coincidencias mientras se escribe, también cuando queda una sola:
+    // al afinar el nombre lo esperable es ver al alumno y poder tocarlo, no que la lista se cierre.
+    // La única excepción es el DNI exacto, donde no hay nada que elegir y Enter ya registra.
+    const mostrarSugerencias = !exacto && sugerencias.length > 0;
 
     const registrar = async (alumno) => {
         setEnviando(true);
